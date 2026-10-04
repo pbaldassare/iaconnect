@@ -32,28 +32,51 @@ Controlli al momento della consegna: 539 test, controllo dei tipi, lint e build 
 
 ## Cosa serve per accenderlo
 
-In ordine. Senza i primi quattro passi l'interfaccia mostra "non disponibile" dopo l'accesso.
+Già fatto il 2026-10-04:
 
-1. **Esporre lo schema.** Supabase → Project Settings → API → Exposed schemas: aggiungere `ia_connect`.
-2. **Indirizzi di accesso.** Supabase → Authentication → URL Configuration: aggiungere
-   `<APP_URL>/auth/callback` ai Redirect URLs.
-3. **Primo amministratore.** Creare il proprio utente (Authentication → Add user), poi nell'editor SQL:
-   ```sql
-   insert into ia_connect.memberships (user_id, role)
-   select id, 'platform_admin' from auth.users where email = 'LA-TUA-MAIL';
+- Lo schema `ia_connect` è esposto nell'API (vedi nota sotto).
+- L'utente `paolo.baldassare@gmail.com` è amministratore della piattaforma. Si entra con la stessa
+  password usata per "alter ego".
+- I file `.env` (radice) e `apps/web/.env.local` esistono, con i valori pubblici e un
+  `OAUTH_STATE_SECRET` generato. Non sono nel repository.
+
+Resta da fare, in ordine:
+
+1. **Chiavi.** Compilare in `.env` e in `apps/web/.env.local` le righe vuote:
+   `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`, `ANTHROPIC_API_KEY`, `OUTBOUND_OVERRIDE_RECIPIENT`.
+   Accanto a ciascuna c'è scritto dove si trova.
+2. **Prova in locale.** `npm run dev -w @ia-connect/web` e, in un altro terminale,
+   `npm run start -w @ia-connect/worker`. Entrare su http://localhost:3000, creare un'azienda di prova
+   dall'area admin e percorrere le pagine: nessuna è stata ancora usata con un accesso vero.
+3. **Indirizzi di accesso.** Supabase → Authentication → URL Configuration: aggiungere
+   `<APP_URL>/auth/callback` ai Redirect URLs. Serve per il link via mail e per gli inviti; l'accesso
+   con password funziona anche senza.
+4. **Webhook.** Pubblicare la edge function e provarla (non è mai stata eseguita; il suo codice si
+   compila in un unico file senza moduli Node):
+   ```bash
+   npx supabase login
+   npx supabase functions deploy webhook --project-ref ywsolxklcyctrezngclz
    ```
-4. **Variabili d'ambiente.** Copiare `.env.example` e compilare almeno: `SUPABASE_SERVICE_ROLE_KEY`,
-   `DATABASE_URL`, `ANTHROPIC_API_KEY`, `APP_URL`, `OAUTH_STATE_SECRET` (`openssl rand -hex 32`).
-   Fuori produzione impostare `OUTBOUND_OVERRIDE_RECIPIENT`: ogni messaggio va a quel recapito.
 5. **App dei fornitori.** Google (Gmail, Calendar), Microsoft Entra, Meta (WhatsApp, pagine, Instagram):
    creare le app, registrare `<APP_URL>/api/oauth/<connettore>/callback`, compilare le variabili relative.
+   Nell'app Meta puntare WhatsApp a `…/webhook/p/whatsapp_meta` e le pagine a `…/webhook/p/meta_social`.
    Dettagli in [moduli/connettori.md](moduli/connettori.md).
-6. **Webhook.** Pubblicare la edge function (`supabase functions deploy webhook`) e provarla: non è mai
-   stata eseguita. Nell'app Meta puntare WhatsApp a `…/webhook/p/whatsapp_meta` e le pagine a
-   `…/webhook/p/meta_social`.
-7. **Worker.** Costruire l'immagine con `apps/worker/Dockerfile` su un VPS in UE. Bloccare a livello
+6. **Worker.** Costruire l'immagine con `apps/worker/Dockerfile` su un VPS in UE. Bloccare a livello
    di rete l'uscita verso indirizzi privati (elenco in [moduli/worker.md](moduli/worker.md)).
-8. **Interfaccia.** Pubblicare `apps/web` su un servizio che esegue Next.js, con le stesse variabili.
+7. **Interfaccia.** Pubblicare `apps/web` su un servizio che esegue Next.js, con le stesse variabili.
+
+**Nota sullo schema esposto.** L'esposizione è fatta con un'impostazione del database, non dalla
+pagina di Supabase, quindi in Project Settings → API l'elenco mostra ancora solo `public` e
+`graphql_public`:
+
+```sql
+alter role authenticator set pgrst.db_schemas = 'public, graphql_public, ia_connect';
+notify pgrst, 'reload config';
+```
+
+Questa impostazione prevale su quella della pagina. Per aggiungere in futuro un altro schema va
+ripetuto il comando con l'elenco completo; per tornare alla pagina:
+`alter role authenticator reset pgrst.db_schemas;`.
 
 ## Decisioni da confermare
 
