@@ -38,14 +38,14 @@ export function AutoRefresh({
   ) : null;
 }
 
-export function RefreshButton({ label = "Aggiorna" }: { label?: string }) {
+export function RefreshButton({ label = "Aggiorna", size = "sm" }: { label?: string; size?: "md" | "sm" }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   return (
     <Button
       type="button"
       variant="secondary"
-      size="sm"
+      size={size}
       aria-disabled={pending}
       onClick={() => startTransition(() => router.refresh())}
     >

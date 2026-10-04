@@ -27,7 +27,6 @@ export default async function EditWithAssistantPage({ params }: { params: Promis
     <>
       <PageHeader
         title="Modifica con l'assistente"
-        eyebrow={flow.name}
         description="L'assistente parte dall'ultima versione del flusso. La modifica viene salvata come nuova versione in bozza: quella attiva non cambia finché non attivi la nuova."
         back={{ href: `/app/flussi/${flow.id}`, label: flow.name }}
       />

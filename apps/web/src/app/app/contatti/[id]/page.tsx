@@ -114,7 +114,6 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
     <>
       <PageHeader
         title={name}
-        eyebrow="Contatto"
         back={{ href: "/app/contatti", label: "Contatti" }}
         actions={
           <>

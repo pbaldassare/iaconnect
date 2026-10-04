@@ -59,7 +59,7 @@ export default async function NewConnectionPage({
       <PageHeader
         title={reconnect ? `Ricollega «${reconnect.name}»` : `Collega ${connector.name}`}
         description={connector.description}
-        eyebrow={connectModeLabel(connector.connectMode)}
+        context={connectModeLabel(connector.connectMode)}
         back={{ href: "/app/collegamenti", label: "Collegamenti" }}
       />
       <div className="grid max-w-2xl gap-5">

@@ -56,10 +56,10 @@ describe("describeStep", () => {
       "Invia su WhatsApp il modello «preventivo_pronto» al contatto",
     );
     expect(step("mail.send", { to: "{{event.payload.from}}", subject: "Conferma", body: "…" })).toBe(
-      "Invia una mail a [evento: from] con oggetto «Conferma»",
+      "Invia una mail a [evento: mittente] con oggetto «Conferma»",
     );
     expect(step("sms.send", { text: "Ciao {{contact.full_name}}" })).toBe(
-      "Invia un SMS al contatto: «Ciao [contatto: full_name]»",
+      "Invia un SMS al contatto: «Ciao [contatto: nome]»",
     );
   });
 
@@ -75,20 +75,20 @@ describe("describeStep", () => {
 
   it("summarizes logic, data and people blocks", () => {
     expect(step("logic.condition", { left: "{{event.payload.total}}", operator: "gte", right: 100 })).toBe(
-      "Controlla se [evento: total] è almeno «100»",
+      "Controlla se [evento: totale] è almeno «100»",
     );
     expect(step("logic.condition", { left: "{{contact.email}}", operator: "exists" })).toBe(
-      "Controlla se [contatto: email] è presente",
+      "Controlla se [contatto: mail] è presente",
     );
     expect(
       step("logic.switch", { value: "{{steps.c.output.category}}", cases: [{ equals: "a", goto: "x" }] }),
-    ).toBe("Sceglie la strada in base a [passo c: category] (1 caso)");
+    ).toBe("Sceglie la strada in base a [passo c: categoria] (1 caso)");
     expect(
       step("contact.upsert", {
         phone: "{{event.payload.phone}}",
         consent: { channel: "whatsapp", source: "x" },
       }),
-    ).toBe("Cerca il contatto e lo crea se manca ([evento: phone]); registra il consenso per WhatsApp");
+    ).toBe("Cerca il contatto e lo crea se manca ([evento: telefono]); registra il consenso per WhatsApp");
     expect(step("human.request_approval", { summary: "Sconto del 10%" })).toBe(
       "Chiede l'approvazione di una persona: «Sconto del 10%» (scade dopo 48 ore)",
     );
@@ -109,7 +109,7 @@ describe("describeStep", () => {
 
   it("summarizes AI blocks", () => {
     expect(step("ai.extract", { text: "x", fields: [{ name: "name" }, { name: "phone" }] })).toBe(
-      "Ricava dal testo: name, phone",
+      "Ricava dal testo: nome, telefono",
     );
     expect(step("ai.classify", { text: "x", categories: [{ key: "reclamo" }, { key: "info" }] })).toBe(
       "Classifica il testo tra: reclamo, info",
@@ -146,14 +146,19 @@ describe("trigger and labels", () => {
     expect(eventTitle("custom.listing.matched")).toBe("Evento interno «listing.matched»");
     expect(eventTitle(null)).toBe("—");
     expect(describeCondition({ field: "payload.subject", operator: "contains", value: "preventivo" })).toBe(
-      "subject contiene «preventivo»",
+      "oggetto contiene «preventivo»",
     );
-    expect(describeTrigger(BRANCHING.trigger)).toBe("Mail ricevuta, se subject contiene «preventivo»");
+    expect(describeTrigger(BRANCHING.trigger)).toBe("Mail ricevuta, se oggetto contiene «preventivo»");
     expect(outletLabel("onReply")).toBe("se risponde");
     expect(outletLabel("onTimeout")).toBe("alla scadenza");
     expect(humanizeRefs("{{steps.extract.output.data.name}} e {{org.name}}")).toBe(
-      "[passo extract: data.name] e [azienda: name]",
+      "[passo extract: nome] e [azienda: nome]",
     );
+    // With the step numbers of the schema, and keys without an Italian name.
+    expect(
+      humanizeRefs("{{steps.extract.output.data.tipo_polizza}}", { steps: new Map([["extract", 1]]) }),
+    ).toBe("[passo 1: tipo polizza]");
+    expect(humanizeRefs("{{event.payload.address.city}}")).toBe("[evento: indirizzo › città]");
   });
 });
 
@@ -358,7 +363,7 @@ describe("buildDiagram", () => {
   it("puts each issue next to its step", () => {
     const result = validateFlow(BRANCHING, { connections: [], templates: [], stages: [] });
     const view = buildDiagram(result.definition!, result.issues);
-    expect(view.trigger).toBe("Mail ricevuta, se subject contiene «preventivo»");
+    expect(view.trigger).toBe("Mail ricevuta, se oggetto contiene «preventivo»");
     expect(view.steps).toHaveLength(5);
     const send = view.steps[0]!;
     expect(send.summary).toContain("preventivo_pronto");

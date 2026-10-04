@@ -1,6 +1,7 @@
 import { channelLabel } from "../customer-labels";
 import { formatDateTime, formatMoney } from "../format";
 import { durationLabel } from "./describe";
+import { fieldName } from "./field-labels";
 
 /**
  * What a step did — or, in a simulation, what it would have done — read from the
@@ -291,7 +292,8 @@ export function stepOutcome(step: OutcomeInput, names: OutcomeNames = {}): StepO
     }
 
     case "ai.extract": {
-      for (const [key, value] of Object.entries(bag(out.data))) b.add(key, text(value) || compact(value));
+      for (const [key, value] of Object.entries(bag(out.data)))
+        b.add(fieldName(key), text(value) || compact(value));
       const missing = Array.isArray(out.missing)
         ? out.missing.filter((item) => typeof item === "string")
         : [];

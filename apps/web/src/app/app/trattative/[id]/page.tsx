@@ -131,7 +131,6 @@ export default async function DealPage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader
         title={deal.title}
-        eyebrow="Trattativa"
         back={{ href: "/app/trattative", label: "Trattative" }}
         description={
           <>

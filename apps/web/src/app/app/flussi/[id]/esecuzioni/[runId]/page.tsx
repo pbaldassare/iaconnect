@@ -82,7 +82,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
     <>
       <PageHeader
         title={`Esecuzione del ${formatDateTime(run.started_at)}`}
-        eyebrow={flow.data?.name ?? "Flusso"}
+        context={flow.data?.name ?? "Flusso"}
         back={{ href: `/app/flussi/${id}?scheda=esecuzioni`, label: "Esecuzioni" }}
         actions={
           <>

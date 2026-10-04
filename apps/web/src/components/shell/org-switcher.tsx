@@ -24,7 +24,7 @@ export function OrgSwitcher({
         name="org"
         defaultValue={currentId ?? ""}
         onChange={() => formRef.current?.requestSubmit()}
-        className="h-9 w-full rounded-lg border border-line-strong bg-surface px-2 text-sm font-semibold"
+        className="h-10 w-full truncate rounded-lg border border-line-strong bg-surface pl-2.5 pr-9 text-sm font-semibold"
       >
         {currentId === null ? <option value="">Scegli…</option> : null}
         {organizations.map((o) => (

@@ -116,6 +116,18 @@ const PATHS = {
     </>
   ),
   moon: <path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z" />,
+  monitor: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="11.5" rx="1.5" />
+      <path d="M9 20h6M12 16v4" />
+    </>
+  ),
+  sidebar: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
+    </>
+  ),
   search: (
     <>
       <circle cx="11" cy="11" r="6.5" />

@@ -10,7 +10,8 @@ import { cn } from "@/lib/cn";
  *
  * - `caption` is required and read by screen readers only.
  * - `minWidth` (px) is the width under which the table scrolls instead of squeezing.
- * - Td `mono` for ids, numbers and timestamps; `muted` for secondary text.
+ * - Td `mono` for ids, numbers and timestamps (never wraps); `muted` for secondary text.
+ * - The first column (what the row is) never gets narrower than 160px.
  * - For an empty list render <EmptyState> instead of an empty table.
  * - The wrapper has `contain: inline-size`, so a wide table never stretches the grid or flex
  *   parent it sits in: the page does not scroll sideways, only the table does.
@@ -43,7 +44,7 @@ export function Table({
       aria-label={caption}
     >
       <table
-        className="w-full border-collapse text-left text-sm [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:hover]:bg-surface-2/50"
+        className="w-full border-collapse text-left text-sm [&_tbody_td:first-child]:min-w-40 [&_tbody_tr:last-child_td]:border-b-0 [&_tbody_tr:hover]:bg-surface-2/50"
         style={{ minWidth }}
       >
         <caption className="sr-only">{caption}</caption>
@@ -93,7 +94,7 @@ export function Td({
       className={cn(
         "border-b border-line px-3 py-2.5 align-top first:pl-4 last:pr-4",
         ALIGN[align],
-        mono && "font-mono text-[13px] tabular-nums",
+        mono && "whitespace-nowrap font-mono text-[13px] tabular-nums",
         muted && "text-muted",
         className,
       )}

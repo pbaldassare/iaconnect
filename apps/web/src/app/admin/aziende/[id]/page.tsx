@@ -55,7 +55,7 @@ export default async function OrganizationPage({
   return (
     <>
       <PageHeader
-        eyebrow={sectorLabel(organization.sector)}
+        context={sectorLabel(organization.sector)}
         title={organization.name}
         back={{ href: "/admin/aziende", label: "Aziende" }}
         actions={<StatusPill {...organizationStatus(organization.status)} />}

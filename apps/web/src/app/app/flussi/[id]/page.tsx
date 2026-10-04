@@ -156,7 +156,6 @@ export default async function FlowPage({
     <>
       <PageHeader
         title={flow.name}
-        eyebrow="Flusso"
         description={flow.description || undefined}
         back={{ href: "/app/flussi", label: "Flussi" }}
         actions={
@@ -170,7 +169,7 @@ export default async function FlowPage({
           </>
         }
       />
-      <div className="grid gap-5">
+      <div className="grid gap-4">
         {installed ? (
           <Notice tone={installed === "parziale" ? "warning" : "ok"} announce="status">
             {installed === "parziale"
@@ -219,9 +218,9 @@ export default async function FlowPage({
           </Notice>
         ) : null}
 
-        <Card className="grid gap-3">
-          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
-            <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
+        <Card className="grid gap-3 px-4 py-3 sm:px-5 sm:py-3.5">
+          <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+            <dl className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm sm:grid-cols-3">
               <div>
                 <dt className="text-muted">Parte quando</dt>
                 <dd className="font-medium">

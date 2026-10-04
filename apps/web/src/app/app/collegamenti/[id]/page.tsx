@@ -74,7 +74,7 @@ export default async function ConnectionPage({
     <>
       <PageHeader
         title={connection.name}
-        eyebrow={type ? `${type.name} · ${connectorCategoryLabel(type.category)}` : connection.connector_type}
+        context={type ? `${type.name} · ${connectorCategoryLabel(type.category)}` : connection.connector_type}
         back={{ href: "/app/collegamenti", label: "Collegamenti" }}
       />
       <div className="grid max-w-3xl gap-5">

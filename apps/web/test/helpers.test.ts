@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { errorMessage, fail, formToObject, ok, parseForm } from "../src/lib/action";
-import { changedFields, describeAuditAction, isSupportRow } from "../src/lib/audit-labels";
+import { auditFieldLabel, changedFields, describeAuditAction, isSupportRow } from "../src/lib/audit-labels";
 import { brandToJson, mergeBrand, parseBrand } from "../src/lib/brand";
 import {
   aggregateAiSpend,
@@ -97,6 +97,10 @@ describe("audit labels", () => {
   it("reads the changed fields", () => {
     expect(changedFields({ changed: ["name", "status", 3] })).toEqual(["name", "status"]);
     expect(changedFields({})).toEqual([]);
+    expect(auditFieldLabel("stage_id")).toBe("fase");
+    expect(auditFieldLabel("status")).toBe("stato");
+    expect(auditFieldLabel("webhook_token")).toBe("webhook token");
+    expect(auditFieldLabel("template_id")).toBe("template");
     expect(changedFields(null)).toEqual([]);
   });
 });
