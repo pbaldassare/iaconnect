@@ -64,5 +64,22 @@ docs/           PROGETTO.md, decisioni/, specifiche
 
 ## Comandi
 
-Da completare alla creazione del repository: installazione, avvio locale,
-test, lint, migrazioni.
+```bash
+npm install                          # dipendenze (npm workspaces)
+npm test                             # tutti i test; il database gira in memoria (PGlite)
+npx vitest run <cartella>            # test di un solo pacchetto
+npm run typecheck                    # tipi di tutti i pacchetti
+npm run lint                         # Biome (npm run format per correggere)
+npm run dev -w @ia-connect/web       # interfaccia in locale
+npm run build -w @ia-connect/web     # build dell'interfaccia
+npm run start -w @ia-connect/worker  # worker (richiede DATABASE_URL)
+npm run gen:types                    # dopo ogni migrazione: rigenera packages/core/src/database.gen.ts
+npm run gen:seed                     # dopo aver cambiato i modelli di flusso in packages/core
+```
+
+Migrazioni: un nuovo file in `supabase/migrations/` (mai modificare quelli già applicati),
+poi `npm run gen:types` e `npx vitest run supabase`. Il database è lo schema `ia_connect`
+del progetto Supabase "alter ego" (vedi `docs/decisioni/`): non toccare lo schema `public`.
+
+Gli import relativi in `packages/core` e `packages/connectors` usano l'estensione `.ts`
+(servono alla edge function Deno).

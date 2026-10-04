@@ -1,8 +1,6 @@
 -- IA Connect: tables. Everything lives in the `ia_connect` schema.
 -- Customer tables carry `organization_id`; RLS is enabled in the next migration.
 
-set search_path = ia_connect, public;
-
 create or replace function ia_connect.set_updated_at() returns trigger
 language plpgsql as $$
 begin
