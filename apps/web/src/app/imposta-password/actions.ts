@@ -1,5 +1,6 @@
 "use server";
 import { type ActionResult, fail, parseForm } from "@/lib/action";
+import { LANDING_PATH } from "@/lib/routes";
 import { requireUser } from "@/lib/session";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -27,5 +28,5 @@ export async function setPassword(_prev: ActionResult, formData: FormData): Prom
     console.error("[imposta-password]", error.status, error.message);
     return fail("Non siamo riusciti a salvare la password. Esci, rientra con un link via mail e riprova.");
   }
-  redirect("/app");
+  redirect(LANDING_PATH);
 }

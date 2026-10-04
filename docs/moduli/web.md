@@ -38,7 +38,8 @@ Da fare in Supabase prima di usare l'app:
 1. **Esporre lo schema**: Project Settings → API → Exposed schemas → aggiungere `ia_connect`.
    Finché manca, dopo l'accesso si arriva a `/non-disponibile`.
 2. **Indirizzi di ritorno**: Authentication → URL Configuration → aggiungere
-   `<APP_URL>/auth/callback` tra i Redirect URLs. Il progetto è condiviso con alter ego:
+   `<APP_URL>/auth/callback` tra i Redirect URLs (i link portano sempre un parametro `next`:
+   se le mail riportano alla Site URL invece che all'app, usare `<APP_URL>/auth/callback**`). Il progetto è condiviso con alter ego:
    Site URL e modelli delle mail sono i suoi, quindi le mail di accesso e di invito hanno
    oggi il suo aspetto.
 3. **Primo amministratore**: una riga in `ia_connect.memberships` con
@@ -76,8 +77,11 @@ apps/web
 
 | Indirizzo | Chi | Cosa |
 | --- | --- | --- |
-| `/accedi` | tutti | mail + password, oppure «Ricevi un link via mail» |
-| `/auth/callback` | — | scambia il codice del link, accetta gli inviti, prosegue |
+| `/accedi` | tutti | mail + password, oppure «Ricevi un link via mail»; link a Registrati e Password dimenticata |
+| `/registrati`, `/password-dimenticata`, `/privacy` | tutti | vedi «Registrazione e richieste di accesso» |
+| `/area-riservata`, `/benvenuto` | — | smistano: senza accesso → `/accedi`, altrimenti la pagina giusta per la persona |
+| `/in-attesa`, `/completa-registrazione` | utente senza azienda | richiesta di accesso inviata / da inviare |
+| `/auth/callback` | — | scambia il codice del link, accetta gli inviti, registra la richiesta di accesso, prosegue |
 | `/auth/conferma` | — | link che portano la sessione nel frammento dell'indirizzo (inviti) |
 | `/imposta-password` | utente | sceglie o cambia la password |
 | `/nessuna-azienda` | utente | nessuna azienda collegata, oppure azienda sospesa |
@@ -88,7 +92,7 @@ apps/web
 | `/admin/aziende`, `/nuova`, `/[id]` | admin piattaforma e rivenditore | elenco, creazione, scheda |
 | `/admin/aziende/[id]/export` | come sopra | scarica il JSON di `export_organization` |
 | `/admin/registro` | come sopra | registro con filtri |
-| `/admin/catalogo`, `/piani`, `/rivenditori`, `/monitoraggio` | solo admin piattaforma | |
+| `/admin/richieste`, `/catalogo`, `/piani`, `/rivenditori`, `/monitoraggio` | solo admin piattaforma | |
 
 La scheda azienda usa `?scheda=` per le sezioni: `dati`, `utenti`, `collegamenti`, `flussi`,
 `consumi`, `funzioni`, `personalizzazioni`, `assistenza`.
@@ -127,9 +131,10 @@ uscire dall'account o passare a una propria azienda chiude la sessione. I trigge
 database marcano `is_support_access` su ogni modifica fatta dallo staff: il cliente le vede
 in Impostazioni → Registro con l'etichetta «Assistenza».
 
-**Inviti.** Nessuna registrazione libera. L'invito è una riga in `invitations`; a ogni
-accesso (`/accedi`, `/auth/callback`, `/auth/conferma`, e in `/nessuna-azienda`) si chiama
-`accept_invitations()`, che la trasforma in appartenenza.
+**Inviti.** L'invito è una riga in `invitations`; a ogni accesso (`/accedi`,
+`/auth/callback`, `/auth/conferma`, `/area-riservata`, e in `/nessuna-azienda`) si chiama
+`accept_invitations()`, che la trasforma in appartenenza. Chi non è invitato può registrarsi
+da solo: vedi «Registrazione e richieste di accesso».
 
 **Layout.** I layout di `/app` e `/admin` disegnano il guscio ma **non sono un controllo**:
 ogni pagina e ogni azione chiama da sé `requireOrg()` / `requireStaff()` ecc. (il risultato
@@ -712,3 +717,142 @@ Punti aperti:
 - **CSP senza nonce**: `'unsafe-inline'` sugli script lascia a un eventuale XSS la
   possibilità di eseguire codice; chiude comunque script esterni, frame e invii di moduli
   verso altri siti.
+
+## Registrazione e richieste di accesso
+
+Chiunque può creare un account e chiedere l'accesso per la propria azienda; l'azienda nasce
+solo quando un amministratore della piattaforma approva la richiesta
+(`docs/decisioni/2026-10-04-14-registrazione-con-approvazione.md`). «Essere entrati» e «avere
+un accesso» sono quindi due cose diverse: nel progetto Auth, condiviso con un'altra
+applicazione, ci sono anche persone che IA Connect non l'hanno mai chiesto.
+
+### Pagine
+
+| Indirizzo | Chi | Cosa |
+| --- | --- | --- |
+| `/registrati` | senza accesso | nome, azienda, settore, telefono, mail, password (con «Mostra»), nota, casella dell'informativa. Dopo l'invio: «Controlla la posta» con l'indirizzo usato e «Rinvia la mail» |
+| `/password-dimenticata` | tutti | chiede la mail di recupero; il link porta a `/imposta-password` |
+| `/privacy` | tutti | **segnaposto**: il testo dell'informativa va fornito dal titolare prima dell'apertura al pubblico |
+| `/area-riservata` | tutti | ingresso dal sito di presentazione: senza accesso → `/accedi`, altrimenti la pagina della persona. `/benvenuto` fa lo stesso ed è dove torna la mail di conferma |
+| `/in-attesa` | chi ha una richiesta in attesa o rifiutata | «Richiesta ricevuta»: cosa succede adesso, dati inviati, modifica e nuovo invio, uscita. Se rifiutata mostra il motivo e il modulo per inviarla di nuovo. A ogni caricamento ricontrolla: azienda attivata (o invito arrivato) → `/app` |
+| `/completa-registrazione` | chi è entrato ma non ha né ruolo né richiesta | azienda, settore, telefono, nota → `request_access`. Serve anche a chi esiste nell'Auth condiviso e non si è mai registrato qui |
+| `/admin/richieste` | solo admin piattaforma | richieste in attesa (dalla più vecchia) con **Approva** (scelta del piano) e **Rifiuta** (motivo obbligatorio); sotto, le ultime 50 decise con chi ha deciso |
+
+Nell'area admin la voce «Richieste» ha il numero di quelle in attesa, e l'elenco delle aziende
+(la pagina a cui porta `/admin`) lo ripete in un avviso.
+
+### Dove va una persona dopo l'accesso
+
+Una sola funzione pura, `landingRoute` in `lib/landing-route.ts` (test in
+`test/landing-route.test.ts`):
+
+| Situazione | Pagina |
+| --- | --- |
+| admin di piattaforma o di rivenditore | `/admin` |
+| membro di un'azienda | `/app` |
+| richiesta in attesa o rifiutata | `/in-attesa` |
+| richiesta approvata ma nessuna azienda (tolto dall'azienda, azienda eliminata) | `/nessuna-azienda` |
+| niente | `/completa-registrazione` |
+
+`destinationAfterSignIn(landing, next)` decide poi tra questa pagina e quella richiesta con
+`next`: chi ha un'area va dove aveva chiesto; chi non ce l'ha resta sulla propria pagina,
+tranne `/imposta-password` che è sempre ammessa (inviti e recupero password).
+
+`lib/access.ts` (solo server) mette in fila le chiamate, ed è usato da ogni punto di ingresso
+(`/accedi` con password, `/auth/callback`, `/auth/conferma`, `/area-riservata`):
+
+1. `accept_invitations()`;
+2. lettura dei ruoli; chi ne ha uno non tocca nemmeno `access_requests` (l'accesso continua a
+   funzionare anche su un database a cui manca la migrazione);
+3. chi non ha ruoli né richiesta, ma ha i dati della registrazione in
+   `user_metadata.ia_connect_registration`, viene registrato con `request_access`;
+4. `landingRoute`.
+
+Il middleware manda a `/area-riservata` chi è già entrato e apre `/accedi` o `/registrati`
+(`signedInRedirect` in `lib/routes.ts`). `/nessuna-azienda` rimanda a `/in-attesa` o a
+`/completa-registrazione` quando è quello il caso: resta per le aziende sospese e per chi ha
+perso l'accesso.
+
+### Registrazione
+
+`registrati/actions.ts → register`:
+
+1. controlli contro gli script (`checkFormSubmission` in `lib/registration.ts`): campo
+   trappola `reference_code` (se compilato si risponde come se fosse andata bene, senza fare
+   nulla) e tempo minimo di 3 secondi dal momento in cui la pagina è stata generata;
+2. validazione (stessi limiti del database: azienda 2–120 caratteri, nome 120, telefono 40,
+   nota 1000; password da 10 a 72 caratteri);
+3. `supabase.auth.signUp` con i dati del modulo in `options.data.ia_connect_registration`
+   (chiave dedicata: i metadati sono condivisi con l'altra applicazione) e ritorno a
+   `<APP_URL>/auth/callback?next=/benvenuto`;
+4. se Supabase restituisce una sessione (conferma della mail disattivata): `completeSignIn`
+   e si arriva a `/in-attesa`; altrimenti «Controlla la posta».
+
+La risposta è la stessa per un indirizzo nuovo e per uno già registrato. Con la conferma
+della mail disattivata questo non è più vero (un indirizzo nuovo entra subito): un motivo in
+più per tenerla attiva. La richiesta nasce solo con una mail confermata: lo controlla
+`request_access`.
+
+Il link di conferma va aperto nello stesso browser della registrazione (PKCE). Aperto
+altrove conferma comunque l'indirizzo: la persona arriva a `/accedi` con l'avviso, entra con
+mail e password, e la richiesta viene creata in quel momento dai metadati.
+
+### Database
+
+Migrazione `20261004002000_access_requests.sql`, test `supabase/test/access-requests.test.ts`.
+
+- `access_requests`: una riga per utente. Si legge la propria; gli admin di piattaforma le
+  leggono tutte; gli admin dei rivenditori nessuna. Nessuna scrittura diretta.
+  `organization_id` qui significa «l'azienda nata da questa richiesta», non «l'azienda a cui
+  appartiene la riga»: un collega invitato dopo non vede la richiesta del titolare.
+- `request_access(nome, azienda, settore, telefono, nota)`: crea la richiesta o la riscrive
+  finché è in attesa o dopo un rifiuto (torna in attesa). Rifiuta chi non ha la mail
+  confermata (`IAC10`), chi ha già un ruolo o è già stato approvato (`IAC11`), testi vuoti o
+  troppo lunghi e settori sconosciuti (`22023`).
+- `decide_access_request(richiesta, approva, piano, nota)`: solo admin di piattaforma, solo
+  richieste in attesa (`IAC12` altrimenti; la riga è bloccata durante la decisione). Approvando
+  crea l'azienda (rivenditore `default`, piano attivo indicato) e l'appartenenza `org_owner`: i
+  trigger del registro scrivono l'admin come autore. In più scrive `access_request.approve` o
+  `access_request.reject` (etichette in `lib/audit-labels.ts`).
+
+I messaggi italiani per questi codici sono in `accessRequestErrorMessage`.
+
+### Abusi
+
+Il modulo è pubblico. Oggi lo proteggono: i limiti di Supabase Auth (registrazioni e mail per
+ora), il campo trappola e il tempo minimo (fermano gli script generici, non un attacco
+mirato: il momento di inizio non è firmato), i limiti di lunghezza nel database, una sola
+richiesta per utente. **Prima dell'apertura al pubblico va attivato un CAPTCHA in Supabase
+Auth** (Authentication → Attack Protection, ad esempio Cloudflare Turnstile) e aggiunto al
+modulo passando il token in `options.captchaToken`: non è stato fatto. Attivarlo senza
+aggiornare il modulo blocca la registrazione (la pagina lo dice) e, essendo l'impostazione
+condivisa, riguarda anche l'altra applicazione.
+
+### Senza chiave di servizio
+
+In `/admin/richieste` al posto della mail compare l'identificativo abbreviato dell'utente e
+un avviso spiega perché. Approvare e rifiutare funziona lo stesso. Tutto il resto della
+registrazione non usa la chiave di servizio.
+
+### Verifiche
+
+Fatte: test del database (17: mail non confermata rifiutata, invio e nuovo invio, ognuno vede
+solo la propria, nessuna scrittura diretta, chi non è admin non decide, l'approvazione crea
+azienda e titolare e l'utente la vede, doppia decisione rifiutata, nuovo invio dopo un
+rifiuto, limiti dei testi, settori uguali a `packages/core`), test delle funzioni pure
+(destinazioni, metadati, controlli del modulo, messaggi, navigazione), tipi, Biome, build
+Next.js e build per Cloudflare. Dalla build avviata: `/registrati`, `/accedi`,
+`/password-dimenticata`, `/privacy` rispondono 200 senza accesso; `/area-riservata`,
+`/in-attesa`, `/admin/richieste` rimandano a `/accedi`.
+
+**Non verificate**: tutte le chiamate a Supabase Auth (`signUp`, `resend`,
+`resetPasswordForEmail`, il ritorno dei link) e ogni pagina che richiede l'accesso
+(`/in-attesa`, `/completa-registrazione`, `/admin/richieste`): dall'ambiente di sviluppo non
+si creano account sul progetto reale. I messaggi d'errore di Auth sono riconosciuti per
+codice e per testo, ma non sono stati provocati davvero.
+
+Limiti noti:
+
+- nessuna mail all'admin per una nuova richiesta, né alla persona per l'esito;
+- `/admin/richieste` mostra le 100 richieste in attesa più vecchie e le ultime 50 decise;
+- chi cambia idea non può cancellare da solo la propria richiesta né il proprio account.

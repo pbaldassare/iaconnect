@@ -1,4 +1,5 @@
 "use server";
+import { completeSignIn } from "@/lib/access";
 import { type ActionResult, fail, ok, parseForm } from "@/lib/action";
 import { safeNextPath } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
@@ -45,13 +46,16 @@ export async function signIn(_prev: ActionResult, formData: FormData): Promise<A
   if (error) {
     if (error.status === 429) return fail("Troppi tentativi. Aspetta qualche minuto e riprova.");
     if (/email not confirmed/i.test(error.message)) {
-      return fail("Questo indirizzo non è ancora stato confermato. Chiedi un link via mail per entrare.");
+      return fail(
+        "Questo indirizzo non è ancora stato confermato. Apri il link che hai ricevuto alla registrazione, oppure chiedi qui sotto un link via mail per entrare.",
+      );
     }
     if (error.status && error.status >= 500)
       return fail("Il servizio di accesso non risponde. Riprova tra poco.");
-    return fail("Mail o password non corrette. Se non ricordi la password, chiedi un link via mail.");
+    return fail(
+      "Mail o password non corrette. Se non ricordi la password usa «Password dimenticata?» oppure chiedi un link via mail.",
+    );
   }
-  const { error: inviteError } = await supabase.rpc("accept_invitations");
-  if (inviteError) console.error("[accedi] accept_invitations", inviteError.code, inviteError.message);
-  redirect(next);
+  // Invitations, registration data and the page this user belongs to.
+  redirect((await completeSignIn(supabase, next)) ?? next);
 }

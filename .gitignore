@@ -13,3 +13,5 @@ dist
 .open-next
 .wrangler
 !apps/web/.env.production
+apps/web/public/index.html
+apps/web/public/assets

@@ -28,7 +28,8 @@ npm install            # dipendenze di tutti i pacchetti
 npm test               # tutti i test (il database gira in memoria, non serve Supabase)
 npm run typecheck      # controllo dei tipi
 npm run lint           # Biome
-npm run dev -w @ia-connect/web       # interfaccia su http://localhost:3000
+npm run dev -w @ia-connect/web       # sito su http://localhost:3000, area riservata su /accedi
+npm run build          # sito + applicazione in dist/ (quello che pubblica Cloudflare Pages)
 npm run start -w @ia-connect/worker  # worker (richiede DATABASE_URL)
 npm run gen:types      # rigenera i tipi del database dopo una migrazione
 npm run gen:seed       # rigenera il seed dei modelli di flusso

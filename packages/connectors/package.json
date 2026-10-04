@@ -17,9 +17,7 @@
     "imapflow": "^1.0.171",
     "mailparser": "^3.7.2",
     "nodemailer": "^10.0.14",
-    "zod": "^4.1.0"
-  },
-  "devDependencies": {
+    "zod": "^4.1.0",
     "@types/mailparser": "^3.4.5",
     "@types/nodemailer": "^8.0.2"
   }

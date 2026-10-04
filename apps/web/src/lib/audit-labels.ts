@@ -17,6 +17,7 @@ const ENTITY: Record<string, string> = {
   approvals: "Approvazione",
   support_sessions: "Accesso in assistenza",
   messages: "Messaggio",
+  access_requests: "Richiesta di accesso",
 };
 
 const OPERATION: Record<string, string> = {
@@ -33,6 +34,9 @@ const EXPLICIT: Record<string, string> = {
   "support.enter": "Ingresso in assistenza",
   "support.exit": "Uscita dall'assistenza",
   "flow.test_event": "Evento di prova inserito per un flusso",
+  // Written by the database function decide_access_request.
+  "access_request.approve": "Richiesta di accesso approvata: azienda creata",
+  "access_request.reject": "Richiesta di accesso rifiutata",
 };
 
 /** Jobs requested for the worker through lib/jobs.ts (`job.<kind>`). */

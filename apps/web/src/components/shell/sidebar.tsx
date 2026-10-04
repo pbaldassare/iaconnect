@@ -80,6 +80,12 @@ export function Sidebar({
                   >
                     <Icon name={item.icon} className={active ? "text-accent" : "text-muted"} />
                     {item.label}
+                    {item.badge ? (
+                      <span className="ml-auto rounded-full bg-warn-soft px-1.5 py-0.5 font-mono text-[11px] font-semibold leading-none text-warn">
+                        {item.badge > 99 ? "99+" : item.badge}
+                        <span className="sr-only"> in attesa</span>
+                      </span>
+                    ) : null}
                   </Link>
                 </li>
               );

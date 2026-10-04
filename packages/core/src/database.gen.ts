@@ -6,6 +6,57 @@ export type Json = string | number | boolean | null | { [key: string]: Json | un
 export interface Database {
   ia_connect: {
     Tables: {
+      access_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          full_name: string | null;
+          company_name: string;
+          sector: string;
+          phone: string | null;
+          message: string | null;
+          status: string;
+          decided_by: string | null;
+          decided_at: string | null;
+          decision_note: string | null;
+          organization_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          full_name?: string | null;
+          company_name: string;
+          sector?: string;
+          phone?: string | null;
+          message?: string | null;
+          status?: string;
+          decided_by?: string | null;
+          decided_at?: string | null;
+          decision_note?: string | null;
+          organization_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          full_name?: string | null;
+          company_name?: string;
+          sector?: string;
+          phone?: string | null;
+          message?: string | null;
+          status?: string;
+          decided_by?: string | null;
+          decided_at?: string | null;
+          decision_note?: string | null;
+          organization_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       ai_calls: {
         Row: {
           id: string;
@@ -1546,6 +1597,20 @@ export interface Database {
       };
       store_connection_secret: { Args: { p_connection: string; p_secret: Json }; Returns: undefined };
       read_connection_secret: { Args: { p_connection: string }; Returns: Json };
+      request_access: {
+        Args: {
+          p_full_name: string | null;
+          p_company_name: string;
+          p_sector: string;
+          p_phone: string | null;
+          p_message: string | null;
+        };
+        Returns: Database["ia_connect"]["Tables"]["access_requests"]["Row"];
+      };
+      decide_access_request: {
+        Args: { p_request: string; p_approve: boolean; p_plan_key?: string; p_note?: string | null };
+        Returns: Database["ia_connect"]["Tables"]["access_requests"]["Row"];
+      };
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };
       can_manage_org: { Args: { p_org: string }; Returns: boolean };
       has_org_access: { Args: { p_org: string }; Returns: boolean };

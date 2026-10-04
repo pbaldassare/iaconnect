@@ -134,6 +134,9 @@ describe("row level security", () => {
     expect(tables.length).toBeGreaterThan(25);
     for (const { table_name } of tables) {
       if (table_name === "connection_secrets") continue;
+      // access_requests is in this list too, but its organization_id is "the organization the
+      // request became", not a tenant column: rows belong to the requesting user. The check
+      // below still holds for it; who reads what is pinned in access-requests.test.ts.
       const rows = await db.asUser<{ n: number }>(
         ids.ownerA,
         `select count(*)::int as n from ia_connect.${table_name} where organization_id = $1`,
