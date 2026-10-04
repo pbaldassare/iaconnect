@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isKnownEventType } from "../events";
+import { isKnownEventType } from "../events.ts";
 
 export const END = "end";
 

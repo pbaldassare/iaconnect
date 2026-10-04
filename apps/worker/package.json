@@ -1,0 +1,17 @@
+{
+  "name": "@ia-connect/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "typecheck": "tsc --noEmit -p .", "start": "tsx src/main.ts", "dev": "tsx watch src/main.ts" },
+  "dependencies": {
+    "@ia-connect/core": "*",
+    "@ia-connect/connectors": "*",
+    "@ia-connect/ai": "*",
+    "pg": "^8.13.1",
+    "playwright": "^1.49.0",
+    "tsx": "^4.19.2",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": { "@types/pg": "^8.11.10" }
+}

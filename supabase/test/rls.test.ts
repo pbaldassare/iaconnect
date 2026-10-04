@@ -355,3 +355,24 @@ describe("invitations and GDPR", () => {
     expect(audit.n).toBeGreaterThan(0);
   });
 });
+
+describe("jobs requested from the web app", () => {
+  it("accepts only the allowed kinds, inside the caller's organization", async () => {
+    const insert = (user: string, org: string, kind: string) =>
+      db.asUser(
+        user,
+        "insert into ia_connect.scheduled_jobs (organization_id, kind, run_at) values ($1, $2, now())",
+        [org, kind],
+      );
+    await insert(ids.memberA, ids.orgA, "send_message");
+    await insert(ids.ownerA, ids.orgA, "simulate_flow");
+    await expect(insert(ids.memberA, ids.orgA, "simulate_flow")).rejects.toThrow(/row-level security/);
+    await expect(insert(ids.ownerA, ids.orgA, "resume_run")).rejects.toThrow(/row-level security/);
+    await expect(insert(ids.ownerB, ids.orgA, "send_message")).rejects.toThrow(/row-level security/);
+    const jobs = await db.asService<{ created_by: string | null }>(
+      "select created_by from ia_connect.scheduled_jobs where organization_id = $1",
+      [ids.orgA],
+    );
+    expect(jobs.every((job) => job.created_by !== null)).toBe(true);
+  });
+});

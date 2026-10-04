@@ -1,6 +1,6 @@
-import type { ConnectionStatus, ConnectorCategory, PlanLimits } from "../domain";
-import { listReferences } from "../template";
-import { getBlock } from "./catalog";
+import type { ConnectionStatus, ConnectorCategory, PlanLimits } from "../domain.ts";
+import { listReferences } from "../template.ts";
+import { getBlock } from "./catalog.ts";
 import {
   CONTINUING_OUTLETS,
   END,
@@ -8,7 +8,7 @@ import {
   FlowDefinitionSchema,
   OUTLETS,
   type Step,
-} from "./schema";
+} from "./schema.ts";
 
 export interface ValidationContext {
   connections: { id: string; category: ConnectorCategory; status: ConnectionStatus }[];

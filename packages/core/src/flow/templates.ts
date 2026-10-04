@@ -1,5 +1,5 @@
-import type { Sector } from "../domain";
-import type { FlowDefinition } from "./schema";
+import type { Sector } from "../domain.ts";
+import type { FlowDefinition } from "./schema.ts";
 
 /**
  * Sector flow templates published by the platform. They are data: installing

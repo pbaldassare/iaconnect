@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { ConnectionStatus, ConnectorCategory } from "../domain";
-import type { NormalizedEventInput } from "../events";
+import type { ConnectionStatus, ConnectorCategory } from "../domain.ts";
+import type { NormalizedEventInput } from "../events.ts";
 
 /**
  * Contract every connector implements. The flow engine only knows this
@@ -108,8 +108,20 @@ export interface Connector {
   verify(context: ConnectorContext): Promise<HealthStatus>;
   /** Polling source. */
   poll?(context: ConnectorContext, cursor: Record<string, unknown> | undefined): Promise<PollResult>;
-  /** Webhook source. Must verify the signature. */
+  /**
+   * Webhook source for one connection. Must verify the signature, unless the request
+   * already passed `receiveProviderWebhook`.
+   */
   handleWebhook?(context: ConnectorContext, request: WebhookRequest): Promise<WebhookResult>;
+  /**
+   * Provider-level webhooks: one URL for every customer (e.g. Meta). Verifies the request
+   * with platform secrets from `env`, answers handshakes, and lists the external account ids
+   * the payload is addressed to; `handleWebhook` then runs once per matching connection.
+   */
+  receiveProviderWebhook?(
+    request: WebhookRequest,
+    env: Record<string, string | undefined>,
+  ): Promise<{ verified: boolean; accountIds: string[]; response?: WebhookResult["response"] }>;
   actions: Record<string, ActionDefinition<any, any>>;
   disconnect(context: ConnectorContext): Promise<void>;
 }

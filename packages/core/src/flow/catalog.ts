@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { CHANNELS, type ConnectorCategory } from "../domain";
-import { isDuration } from "../duration";
-import { FILTER_OPERATORS, type Outlet } from "./schema";
+import { CHANNELS, type ConnectorCategory } from "../domain.ts";
+import { isDuration } from "../duration.ts";
+import { FILTER_OPERATORS, type Outlet } from "./schema.ts";
 
 /**
  * The block catalog. Every block is our own tested code; a flow can only
