@@ -28,7 +28,8 @@ const EXAMPLES: Record<string, string[]> = {
 export default async function NewFlowPage() {
   const context = await requireOrgManager();
   const permissions = await loadFlowPermissions(context);
-  const ready = Boolean(process.env.ANTHROPIC_API_KEY) && hasServiceKey();
+  // In the demo the chat is shown as it looks when configured; sending is refused by the action.
+  const ready = context.demo || (Boolean(process.env.ANTHROPIC_API_KEY) && hasServiceKey());
 
   return (
     <>

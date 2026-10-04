@@ -1,4 +1,5 @@
 import type { z } from "zod";
+import { DEMO_READ_ONLY, DEMO_READ_ONLY_MESSAGE } from "./demo/client";
 
 /**
  * Convention for server actions used with <ActionForm> / useActionState.
@@ -44,6 +45,8 @@ export function errorMessage(error: unknown): string {
   const code = e.code ?? "";
   const message = e.message ?? "";
   if (e.name === "MissingServiceKeyError") return message;
+  // Public demo: every write is refused by the in-memory client with this code.
+  if (code === DEMO_READ_ONLY) return DEMO_READ_ONLY_MESSAGE;
   if (code === "PGRST106" || /schema must be one of/i.test(message)) {
     return "Il database non è ancora raggiungibile dall'app: lo schema ia_connect va aggiunto agli «Exposed schemas» nelle impostazioni API di Supabase.";
   }
@@ -75,7 +78,7 @@ export function errorMessage(error: unknown): string {
 /** `fail()` from a caught or returned error. Logs the technical detail on the server. */
 export function failFromError(error: unknown): ActionResult {
   const e = (typeof error === "object" && error !== null ? error : {}) as ErrorLike;
-  console.error("[action]", e.code ?? "", e.message ?? error);
+  if (e.code !== DEMO_READ_ONLY) console.error("[action]", e.code ?? "", e.message ?? error);
   return fail(errorMessage(error));
 }
 

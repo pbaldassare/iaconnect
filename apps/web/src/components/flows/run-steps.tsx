@@ -3,7 +3,7 @@
  * taken, what the step did or would have done (`stepOutcome`, one reading per
  * block type), error, duration and AI cost.
  *
- *   <RunSteps steps={rows of flow_run_steps} />
+ *   <RunSteps steps={rows of flow_run_steps} stageNames={{ quote_sent: "Proposta inviata" }} />
  */
 import { AiBadge, StatusPill } from "@/components/ui/badge";
 import { blockTitle, outletLabel } from "@/lib/flows/describe";
@@ -41,14 +41,21 @@ function Json({ label, value }: { label: string; value: unknown }) {
   );
 }
 
-export function RunSteps({ steps }: { steps: RunStepRow[] }) {
+export function RunSteps({
+  steps,
+  stageNames,
+}: {
+  steps: RunStepRow[];
+  /** Deal stage key → name, so a step shows «Proposta inviata» instead of `quote_sent`. */
+  stageNames?: Readonly<Record<string, string>>;
+}) {
   if (steps.length === 0) {
     return <p className="text-sm text-muted">Nessun passo registrato.</p>;
   }
   return (
     <ol className="grid gap-2">
       {steps.map((step, index) => {
-        const outcome = stepOutcome(step);
+        const outcome = stepOutcome(step, { stages: stageNames });
         const usesAi = getBlock(step.block)?.usesAi ?? false;
         const outlet = OUTLETS.includes(step.outlet as Outlet)
           ? outletLabel(step.outlet as Outlet)

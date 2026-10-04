@@ -20,7 +20,7 @@ import { changeRole, inviteMember, removeMember, revokeInvitation, setManagePerm
 export const metadata: Metadata = { title: "Utenti" };
 
 export default async function UsersSettingsPage() {
-  const { supabase, org, session } = await requireOrg();
+  const { supabase, org, session, demo } = await requireOrg();
   const organizationId = org.organization.id;
   const [membersResult, invitationsResult] = await Promise.all([
     supabase.from("memberships").select("*").eq("organization_id", organizationId).order("created_at"),
@@ -52,7 +52,7 @@ export default async function UsersSettingsPage() {
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE} Qui vedi solo il tuo accesso.
         </Notice>
-      ) : !hasServiceKey() ? (
+      ) : !demo && !hasServiceKey() ? (
         <Notice tone="warning" className="mb-4" title="Indirizzi mail non disponibili">
           Su questo server manca SUPABASE_SERVICE_ROLE_KEY: gli altri utenti compaiono con un codice al posto
           della mail e gli inviti vengono registrati senza inviare la mail automatica.

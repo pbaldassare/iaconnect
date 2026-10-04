@@ -3,6 +3,7 @@ import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { parseConsents } from "@/lib/contacts/consents";
 import { hasConsent } from "@/lib/contacts/consents";
 import { channelLabel } from "@/lib/customer-labels";
+import { isDemoReadOnly } from "@/lib/demo/client";
 import {
   type OutgoingResult,
   buildFreeMessage,
@@ -94,7 +95,9 @@ export async function markConversationRead(conversationId: string): Promise<void
     .update({ unread_count: 0 })
     .eq("id", conversation.id)
     .eq("organization_id", context.org.organization.id);
-  if (error) console.error("[inbox] markConversationRead", error.code, error.message);
+  // In the public demo the write is refused by design: nothing to log.
+  if (error && !isDemoReadOnly(error))
+    console.error("[inbox] markConversationRead", error.code, error.message);
   else refresh(conversation.id);
 }
 

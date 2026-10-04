@@ -168,7 +168,7 @@ async function Board({ context, stages }: { context: OrgContext; stages: Stage[]
         </Notice>
       ) : null}
       <section
-        className="overflow-x-auto pb-2 contain-inline-size"
+        className="relative overflow-x-auto pb-2 contain-inline-size"
         // biome-ignore lint/a11y/noNoninteractiveTabindex: a scrollable region must be reachable by keyboard
         tabIndex={0}
         aria-label="Trattative per fase"

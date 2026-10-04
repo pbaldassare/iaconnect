@@ -1,5 +1,6 @@
 "use server";
 import { errorMessage } from "@/lib/action";
+import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { issueText } from "@/lib/flows/context";
 import { parseDefinitionJson, sanitizeHistory } from "@/lib/flows/runs";
 import { insertFlowVersion, loadFlowEnvironment, loadFlowPermissions } from "@/lib/flows/server";
@@ -59,6 +60,8 @@ async function recordUsage(organizationId: string, usage: AiUsage): Promise<numb
  */
 export async function askAssistant(request: AssistantRequest): Promise<AssistantReply> {
   const context = await requireOrgManager();
+  // Public demo: no AI call, no service client, nothing saved.
+  if (context.demo) return { ok: false, message: DEMO_READ_ONLY_MESSAGE };
   const { supabase, org } = context;
   const orgId = org.organization.id;
   if (!(await loadFlowPermissions(context)).canUseAssistant) return { ok: false, message: NO_ASSISTANT };
@@ -179,6 +182,8 @@ export async function askAssistant(request: AssistantRequest): Promise<Assistant
 /** "Salva come bozza": a new `flow_versions` row by "ai" (and the flow itself, when new). Never activates. */
 export async function saveProposal(request: SaveProposalRequest): Promise<SaveProposalReply> {
   const context = await requireOrgManager();
+  // Public demo: no AI call, no service client, nothing saved.
+  if (context.demo) return { ok: false, message: DEMO_READ_ONLY_MESSAGE };
   const { supabase, org, session } = context;
   const orgId = org.organization.id;
   if (!(await loadFlowPermissions(context)).canUseAssistant) return { ok: false, message: NO_ASSISTANT };

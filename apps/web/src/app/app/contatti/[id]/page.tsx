@@ -18,7 +18,7 @@ import {
   dealEventLabel,
   stageKind,
 } from "@/lib/customer-labels";
-import { formatDate, formatDateTime, formatMoney, formatRelative } from "@/lib/format";
+import { formatDate, formatDateTime, formatMoney, formatPhone, formatRelative } from "@/lib/format";
 import { messagePreview } from "@/lib/inbox/filters";
 import { isUuid } from "@/lib/org-selection";
 import { requireOrg } from "@/lib/session";
@@ -133,7 +133,7 @@ export default async function ContactPage({ params }: { params: Promise<{ id: st
           <dl className="grid gap-3 text-sm">
             <div>
               <dt className={label}>Telefoni</dt>
-              <dd className="break-words">{contact.phones.join(", ") || "—"}</dd>
+              <dd className="break-words">{contact.phones.map(formatPhone).join(", ") || "—"}</dd>
             </div>
             <div>
               <dt className={label}>Mail</dt>

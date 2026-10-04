@@ -68,7 +68,7 @@ export default async function NewConnectionPage({
             Questo collegamento non è compreso nel piano o nelle funzioni attive della tua azienda. Chiedi
             all'assistenza di attivarlo.
           </Notice>
-        ) : !hasServiceKey() ? (
+        ) : !context.demo && !hasServiceKey() ? (
           <Notice tone="error" title="Il server non è pronto per creare collegamenti">
             {new MissingServiceKeyError().message}
           </Notice>

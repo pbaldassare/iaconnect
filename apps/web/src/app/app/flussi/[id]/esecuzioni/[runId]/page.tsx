@@ -4,8 +4,8 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Notice } from "@/components/ui/form-message";
 import { PageHeader } from "@/components/ui/page-header";
 import { errorMessage } from "@/lib/action";
-import { eventTitle } from "@/lib/flows/describe";
-import { formatDuration } from "@/lib/flows/runs";
+import { blockTitle, eventTitle } from "@/lib/flows/describe";
+import { formatDuration, stepTitles } from "@/lib/flows/runs";
 import { formatDateTime, formatMicros } from "@/lib/format";
 import { runStatus } from "@/lib/labels";
 import { isUuid } from "@/lib/org-selection";
@@ -32,7 +32,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
     .maybeSingle();
   if (!run) notFound();
 
-  const [flow, version, steps, event, contact] = await Promise.all([
+  const [flow, version, steps, event, contact, stages] = await Promise.all([
     supabase
       .from("flows")
       .select("id, name")
@@ -41,7 +41,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
       .maybeSingle(),
     supabase
       .from("flow_versions")
-      .select("version")
+      .select("version, definition")
       .eq("id", run.flow_version_id)
       .eq("organization_id", orgId)
       .maybeSingle(),
@@ -70,7 +70,10 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
           .eq("organization_id", orgId)
           .maybeSingle()
       : Promise.resolve({ data: null }),
+    supabase.from("deal_stages").select("key, name").eq("organization_id", orgId),
   ]);
+  const stageNames = Object.fromEntries((stages.data ?? []).map((stage) => [stage.key, stage.name]));
+  const titles = stepTitles(version.data?.definition, blockTitle);
   const stepRows = steps.data ?? [];
   const totalCost = stepRows.reduce((sum, step) => sum + step.ai_cost_micros, 0);
   const totalDuration = stepRows.reduce((sum, step) => sum + step.duration_ms, 0);
@@ -124,8 +127,10 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
             </div>
             <div>
               <dt className="text-muted">Passo attuale</dt>
-              <dd className="font-mono text-[13px]">
-                {run.finished_at ? "—" : (run.current_step_id ?? "—")}
+              <dd>
+                {run.finished_at || !run.current_step_id
+                  ? "—"
+                  : (titles.get(run.current_step_id) ?? run.current_step_id)}
               </dd>
             </div>
             <div>
@@ -148,7 +153,7 @@ export default async function RunPage({ params }: { params: Promise<{ id: string
           <h2 id="steps-title" className="font-display text-[17px] font-bold tracking-tight">
             Passi eseguiti
           </h2>
-          <RunSteps steps={stepRows} />
+          <RunSteps steps={stepRows} stageNames={stageNames} />
         </section>
       </div>
     </>

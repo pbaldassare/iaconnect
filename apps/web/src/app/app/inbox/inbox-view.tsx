@@ -18,7 +18,7 @@ import { cn } from "@/lib/cn";
 import { hasConsent, parseConsents } from "@/lib/contacts/consents";
 import { CHANNEL_KEYS, channelLabel, conversationStatus, deliveryStatus } from "@/lib/customer-labels";
 import { featureOn } from "@/lib/feature-gate";
-import { formatDateTime, formatMoney, formatRelative } from "@/lib/format";
+import { formatDateTime, formatMoney, formatPhone, formatRelative } from "@/lib/format";
 import {
   INBOX_VIEWS,
   INBOX_VIEW_LABELS,
@@ -274,7 +274,10 @@ export async function InboxView({ params, selectedId }: { params: Params; select
                         {row.status === "closed" ? (
                           <Badge>Chiusa</Badge>
                         ) : row.assignee_type === "user" ? (
-                          <Badge tone="warning">{nameOf(row.assignee_user_id)}</Badge>
+                          <Badge tone="warning">
+                            {/* A mail address is long for a label: the part before @ is enough here. */}
+                            {nameOf(row.assignee_user_id).split("@")[0]}
+                          </Badge>
                         ) : (
                           <Badge>Automazione</Badge>
                         )}
@@ -570,7 +573,7 @@ async function Thread({
               <dl className="mt-2 grid gap-2 text-sm">
                 <div>
                   <dt className="font-mono text-[11px] uppercase tracking-wider text-muted">Telefoni</dt>
-                  <dd className="break-words">{contact.phones.join(", ") || "—"}</dd>
+                  <dd className="break-words">{contact.phones.map(formatPhone).join(", ") || "—"}</dd>
                 </div>
                 <div>
                   <dt className="font-mono text-[11px] uppercase tracking-wider text-muted">Mail</dt>

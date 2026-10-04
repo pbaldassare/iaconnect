@@ -1,5 +1,6 @@
 import "server-only";
 import { type Brand, EMPTY_BRAND, mergeBrand, parseBrand } from "@/lib/brand";
+import { isDemoClient } from "@/lib/demo/client";
 import { createServiceClient, hasServiceKey } from "@/lib/supabase/service";
 import type { Db } from "@/lib/supabase/types";
 import type { Row } from "@ia-connect/core";
@@ -17,7 +18,7 @@ export async function getBranding(supabase: Db, organization: Row<"organizations
     supabase.from("resellers").select("brand").eq("id", organization.reseller_id).maybeSingle(),
   ]);
   let resellerBrand = visibleReseller ? parseBrand(visibleReseller.brand) : EMPTY_BRAND;
-  if (!visibleReseller && hasServiceKey()) {
+  if (!visibleReseller && !isDemoClient(supabase) && hasServiceKey()) {
     const { data } = await createServiceClient()
       .from("resellers")
       .select("brand")

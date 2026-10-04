@@ -1,4 +1,6 @@
 import "server-only";
+import { DEMO_USER_EMAILS } from "@/lib/demo/fixtures";
+import { assertNotDemo, isDemoRequest } from "@/lib/demo/server";
 import { createServiceClient, hasServiceKey } from "@/lib/supabase/service";
 import { confirmedUserByEmail } from "@/lib/users-match";
 
@@ -10,6 +12,14 @@ import { confirmedUserByEmail } from "@/lib/users-match";
 /** user id → email. Empty map when the service key is not configured. */
 export async function resolveUserEmails(userIds: readonly string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
+  if (await isDemoRequest()) {
+    // Demo: the made-up addresses of the fixtures; Supabase Auth is never asked.
+    for (const id of userIds) {
+      const email = DEMO_USER_EMAILS[id];
+      if (email) out.set(id, email);
+    }
+    return out;
+  }
   if (!hasServiceKey() || userIds.length === 0) return out;
   const service = createServiceClient();
   const unique = [...new Set(userIds)].slice(0, 100);
@@ -29,6 +39,7 @@ const MAX_PAGES = 25;
  * Throws MissingServiceKeyError when the key is not configured.
  */
 export async function findUserIdByEmail(email: string): Promise<string | null> {
+  await assertNotDemo();
   const service = createServiceClient();
   for (let page = 1; page <= MAX_PAGES; page++) {
     const { data, error } = await service.auth.admin.listUsers({ page, perPage: PAGE_SIZE });

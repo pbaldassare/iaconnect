@@ -1,5 +1,6 @@
 import { errorMessage } from "@/lib/action";
 import { writeAudit } from "@/lib/audit";
+import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { isUuid } from "@/lib/org-selection";
 import { slugify } from "@/lib/parse";
 import { actorOf, requireOrg } from "@/lib/session";
@@ -11,6 +12,8 @@ const plain = (body: string, status: number) =>
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const context = await requireOrg();
+  // Downloads stay closed in the demo (the middleware already sends demo visitors back).
+  if (context.demo) return plain(DEMO_READ_ONLY_MESSAGE, 403);
   const { supabase, org } = context;
   if (!isUuid(id)) return plain("Contatto non trovato.", 404);
   // `export_contact` runs with the caller's RLS; staff sees every organization, so check the current one here.

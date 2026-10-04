@@ -1,5 +1,6 @@
 import { endSupportSession } from "@/components/shell/actions";
 import { AppShell } from "@/components/shell/app-shell";
+import { DemoBanner } from "@/components/shell/demo-banner";
 import { OrgSwitcher } from "@/components/shell/org-switcher";
 import { Icon } from "@/components/ui/icons";
 import { getBranding } from "@/lib/branding";
@@ -13,7 +14,7 @@ import type { ReactNode } from "react";
  * action under /app calls requireOrg() (or requireOrgManager()) itself.
  */
 export default async function CustomerLayout({ children }: { children: ReactNode }) {
-  const { supabase, session, org, organizations } = await requireOrg();
+  const { supabase, session, org, organizations, demo } = await requireOrg();
   const [brand, unread] = await Promise.all([
     getBranding(supabase, org.organization),
     supabase
@@ -31,7 +32,8 @@ export default async function CustomerLayout({ children }: { children: ReactNode
       brand={{ ...brand, name: brand.name ?? org.organization.name }}
       homeHref="/app"
       items={CUSTOMER_NAV}
-      userEmail={session.user.email}
+      userEmail={demo ? "Demo" : session.user.email}
+      demo={demo}
       crossLink={session.isStaff ? { href: "/admin", label: "Area admin" } : undefined}
       top={
         organizations.length > 1 || (inSupport && organizations.length > 0) ? (
@@ -62,7 +64,9 @@ export default async function CustomerLayout({ children }: { children: ReactNode
         </Link>
       }
       banner={
-        inSupport ? (
+        demo ? (
+          <DemoBanner />
+        ) : inSupport ? (
           <aside
             aria-label="Accesso in assistenza"
             className="z-30 flex md:sticky md:top-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-ink px-4 py-2.5 text-bg sm:px-6 md:px-8"

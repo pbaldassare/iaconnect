@@ -856,3 +856,97 @@ Limiti noti:
 - nessuna mail all'admin per una nuova richiesta, né alla persona per l'esito;
 - `/admin/richieste` mostra le 100 richieste in attesa più vecchie e le ultime 50 decise;
 - chi cambia idea non può cancellare da solo la propria richiesta né il proprio account.
+
+## Demo
+
+L'area cliente si può guardare senza account: `/demo` (il pulsante «Guarda la demo» del sito di
+presentazione) apre `/app` con un'agenzia assicurativa inventata, «Agenzia Demo», in sola
+lettura. Serve a mostrarla a un potenziale cliente e a guardare ogni pagina con dei dati.
+
+### Come funziona
+
+| Pezzo | Dove | Cosa fa |
+| --- | --- | --- |
+| Ingresso e uscita | `app/demo/route.ts`, `app/demo/esci/route.ts` | `/demo` imposta il cookie `ia_demo=1` (httpOnly, SameSite=Lax, 4 ore) e va a `/app`; `/demo/esci` lo toglie e torna a `/` |
+| Regole | `demoDecision` in `lib/routes.ts` | il cookie vale solo sotto `/app`, solo senza una sessione vera, e non per gli indirizzi che finiscono in `/export` |
+| Decisione | `middleware.ts` | è l'unico punto che decide: se la richiesta è demo aggiunge l'intestazione `x-ia-demo` per le pagine (quella mandata dal browser viene sempre scartata) e `X-Robots-Tag: noindex` |
+| Contesto | `lib/session.ts`, `lib/demo/context.ts` | `requireOrg()` e `requireOrgManager()` restituiscono un titolare finto, l'azienda «Agenzia Demo» (assicurazioni, piano Pro), `demo: true` e come `supabase` il client in memoria |
+| Client in memoria | `lib/demo/client.ts` | imita il costruttore di query di supabase-js sopra dei vettori di righe |
+| Dati | `lib/demo/fixtures.ts` | le righe, generate rispetto ad adesso |
+| Interfaccia | `components/shell/demo-banner.tsx`, `app-shell.tsx` | fascia «Stai guardando una demo…» con «Registrati» ed «Esci dalla demo»; nel menu compare «Demo» al posto della mail e non c'è «Cambia password» |
+
+Una sessione vera vince sempre: se il middleware trova un utente entrato ignora il cookie e lo
+cancella. Fuori da `/app` il cookie non conta: `/admin`, `/api/**` e le pagine dell'account
+rimandano a `/accedi` come per chiunque non sia entrato. Le due esportazioni rimandano alla
+pagina da cui partono, con un avviso.
+
+### Perché non può arrivare ai dati veri
+
+- In demo `requireOrg()` non crea alcun client: restituisce quello in memoria. `getSession()`
+  risponde `null`, quindi `requireUser`, `requireStaff`, `requirePlatformAdmin` e
+  `requireStaffForOrg` non sono mai soddisfatti dal cookie.
+- `createClient()` di `lib/supabase/server.ts` in demo lancia un errore invece di creare il
+  client. Il client di servizio è sincrono e non può controllarlo da solo: lo fanno i punti che
+  lo usano nell'area cliente (`resolveUserEmails`, `findUserIdByEmail`, `saveConnection`,
+  `writeConnection`, lettura e scrittura dei segreti, invio dell'invito, `getBranding`), più le
+  azioni dei collegamenti e dell'assistente, che si fermano subito con `if (context.demo)`.
+- Il client in memoria non ha una rete: legge dai vettori e **rifiuta ogni scrittura**
+  (`insert`, `update`, `upsert`, `delete` e ogni funzione che non sia tra quelle di sola
+  lettura: `quota_left`, `export_contact`, `export_organization`, `accept_invitations`…) con
+  il codice `DEMO_READ_ONLY`. `errorMessage()` lo traduce in «Questa è una demo: le modifiche
+  sono disattivate. Registrati per provarlo con i tuoi dati.». I pulsanti restano visibili: chi
+  prova a salvare legge quel messaggio.
+- Il middleware, per chi ha il cookie e nessun cookie di sessione Supabase, non crea nemmeno il
+  client di Auth.
+- Test: `apps/web/test/demo-client.test.ts` (ogni operatore, scritture rifiutate),
+  `demo-routes.test.ts` (regole e middleware), `demo-session.test.ts` (in demo le fabbriche dei
+  client veri non vengono chiamate), `demo-fixtures.test.ts` (dati coerenti).
+
+Chi aggiunge un'azione sotto `/app` che usa il client di servizio, un connettore, l'IA o la
+posta **prima** di scrivere con `context.supabase` deve metterci in cima
+`if (context.demo) return fail(DEMO_READ_ONLY_MESSAGE)`.
+
+### Cambiare i dati
+
+Tutto in `lib/demo/fixtures.ts`: una funzione `buildDemoData(now)` che costruisce le tabelle.
+Le righe hanno il tipo delle tabelle (`Row<"contacts">`…), quindi una colonna sbagliata non
+compila. Le date si scrivono con `ago(giorni, ore, minuti)` e `ahead(…)`, gli identificativi con
+`demoId(gruppo, numero)` (sempre uguali, così i link tra le pagine restano validi). Il flusso
+pilota usa la definizione del modello assicurativo di `packages/core`. Dopo una modifica:
+`npx vitest run apps/web/test/demo-fixtures.test.ts`, che controlla che ogni riferimento punti a
+una riga che esiste, che le definizioni dei flussi passino lo schema e che nomi, numeri
+(`+39 333 000 00xx`) e indirizzi (`….example`) restino inventati. Se una pagina usa un operatore
+di supabase-js che il client non conosce, va aggiunto in `lib/demo/client.ts` con il suo test.
+
+### Verifica
+
+`apps/web/scripts/demo-smoke.mjs` entra da `/demo` e chiede ogni pagina dell'area cliente (93
+indirizzi elencati nel file, più tutti i link interni che trova: 208 pagine): ognuna deve
+rispondere 200 senza la pagina d'errore, con la fascia e con `noindex`. Controlla anche che senza
+cookie `/app` rimandi a `/accedi` e che il cookie non apra `/admin`, `/api` e le esportazioni.
+
+```
+npm run build -w @ia-connect/web && (cd apps/web && npx next start -p 3100) &
+node apps/web/scripts/demo-smoke.mjs
+DEMO_BASE_URL=http://127.0.0.1:8788 node apps/web/scripts/demo-smoke.mjs   # con `npx wrangler pages dev`
+```
+
+Fatto il 2026-10-04 sulla build di Next e nel motore di Cloudflare Pages in locale, più una
+passata a occhio in Chrome a 1280 e 380 px, tema chiaro e scuro, e un tentativo di scrittura
+(modifica di un contatto, invio di un messaggio, richiesta all'assistente): messaggio di sola
+lettura, dati invariati.
+
+### Limiti
+
+- I dati sono uguali per tutti e non cambiano: «Segna come lette», la presa in carico, lo
+  spostamento di una trattativa non hanno effetto (le azioni senza messaggio, come «Segna come
+  lette», non dicono nulla: lo dice la fascia).
+- Le date sono relative al momento della richiesta: ricaricando, «3 ore fa» resta «3 ore fa».
+  Nei primi giorni del mese il report «Questo mese» è quasi vuoto; «Ultimi 30 giorni» no.
+- L'azienda demo è una sola (assicurazioni, piano Pro, titolare): non si vede l'area come
+  collaboratore né con altri settori.
+- Il client in memoria copre gli operatori usati oggi dalle pagine, non tutto PostgREST (niente
+  select annidate, niente `textSearch`). Non applica RLS: non serve, contiene una sola azienda.
+- Un indirizzo che il middleware non vede (finisce in `.png`, `.svg`…) potrebbe ricevere
+  l'intestazione `x-ia-demo` dal browser: otterrebbe solo i dati di esempio, mai quelli veri.
+- I dati di esempio entrano nel pacchetto del server (pochi KiB compressi).

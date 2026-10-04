@@ -37,7 +37,7 @@ export function Meter({
     <div>
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-sm font-semibold">{label}</span>
-        <span className="font-mono text-[13px] tabular-nums">
+        <span className="shrink-0 whitespace-nowrap font-mono text-[13px] tabular-nums">
           {formatNumber(used)}
           <span className="text-muted"> / {limit === null ? "∞" : formatNumber(limit)}</span>
         </span>

@@ -119,8 +119,15 @@ function grantedConsents(value: unknown): string {
     .join(", ");
 }
 
-export function stepOutcome(step: OutcomeInput): StepOutcome {
+/** Names the page knows and the step output does not: deal stages by key. */
+export interface OutcomeNames {
+  stages?: Readonly<Record<string, string>>;
+}
+
+export function stepOutcome(step: OutcomeInput, names: OutcomeNames = {}): StepOutcome {
   const out = bag(step.output);
+  /** A stage is stored by key ("quote_sent"): show its name when the page passed it. */
+  const stage = (value: unknown) => names.stages?.[text(value)] ?? text(value);
   const b = new Builder();
   if (step.status === "failed") return b.done(null);
   if (step.status === "running") return b.done("In corso.");
@@ -185,7 +192,7 @@ export function stepOutcome(step: OutcomeInput): StepOutcome {
       if (sim) {
         const deal = bag(out.deal);
         b.add("Titolo", text(deal.title))
-          .add("Fase", text(deal.stage))
+          .add("Fase", stage(deal.stage))
           .add("Valore", euros(deal.value))
           .add("Prossima azione", text(deal.next_action))
           .add("Campi", compact(deal.custom_fields));
@@ -194,7 +201,7 @@ export function stepOutcome(step: OutcomeInput): StepOutcome {
       return b.done("Trattativa aperta.");
 
     case "deal.update_stage":
-      b.add("Fase", text(out.stage));
+      b.add("Fase", stage(out.stage));
       return b.done(sim ? "La trattativa passerebbe a un'altra fase." : "Trattativa spostata di fase.");
 
     case "crm.read": {
