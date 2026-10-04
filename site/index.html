@@ -31,6 +31,14 @@
   --logo-glyph: #FFFFFF;
   --logo-spark: #F6C25B;
 
+  /* Blocco "+1000": un riquadro di cielo notturno, scuro in entrambi i temi */
+  --more-bg: #0D1F1B;
+  --more-ink: #E9F1EE;
+  --more-muted: #9BAFA8;
+  --more-line: #2A403A;
+  --more-chip: #152A25;
+  --more-accent: #3FD6A2;
+
   /* Colori ufficiali dei servizi collegati (fonte: simple-icons) */
   --brand-whatsapp: #25D366;
   --brand-gmail: #EA4335;
@@ -67,6 +75,7 @@
     --bubble: #1C4334;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
     --logo-tile: #0A8A60;
+    --more-bg: #060D0B;
     color-scheme: dark;
     --photo-filter: brightness(0.84);
   }
@@ -88,6 +97,7 @@
   --bubble: #1C4334;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
   --logo-tile: #0A8A60;
+  --more-bg: #060D0B;
   color-scheme: dark;
   --photo-filter: brightness(0.84);
 }
@@ -503,6 +513,95 @@ a { color: inherit; }
 .conn b { font-weight: 600; line-height: 1.35; padding-top: 1px; }
 .conn span { font-size: 0.88rem; color: var(--muted); line-height: 1.4; }
 
+/* Oltre l'elenco: "+1000" con costellazione e categorie che scorrono */
+.more {
+  position: relative; isolation: isolate; overflow: hidden;
+  margin-top: clamp(40px, 6vw, 64px);
+  background: var(--more-bg); color: var(--more-ink);
+  border: 1px solid var(--more-line); border-radius: 20px;
+}
+.more :focus-visible { outline-color: var(--more-accent); }
+.more-top { position: relative; display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); min-height: 440px; }
+.more-canvas {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: -1;
+  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.3) 34%, #000 58%);
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.16) 0%, rgba(0, 0, 0, 0.3) 34%, #000 58%);
+}
+.more-copy { min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: clamp(24px, 4.5vw, 56px); }
+.more-copy .more-label { max-width: none; font: 500 0.76rem var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--more-accent); }
+.more-copy .more-num {
+  max-width: none; color: var(--more-ink);
+  font-family: var(--font-display); font-weight: 800;
+  font-size: clamp(4.6rem, 15vw, 10.5rem); line-height: 0.82; letter-spacing: -0.05em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  margin: 6px 0 4px -0.04em;
+}
+.more-num i { font-style: normal; color: var(--more-accent); }
+.more-copy h3 { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.5rem, 3.2vw, 2.2rem); line-height: 1.1; letter-spacing: -0.02em; }
+.more-copy p { color: var(--more-muted); font-size: 1.05rem; max-width: 46ch; }
+.more-copy .more-note { font: 400 0.78rem var(--font-mono); letter-spacing: 0.02em; line-height: 1.5; padding-top: 12px; border-top: 1px dashed var(--more-line); }
+.more-sky { position: relative; min-height: 260px; }
+.more-hub {
+  position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
+  border-radius: 18px; box-shadow: 0 0 0 7px var(--more-bg), 0 0 0 8px var(--more-line);
+}
+.more-hub svg { display: block; width: 100%; height: 100%; }
+@media (max-width: 820px) {
+  .more-top { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .more-sky { order: -1; min-height: 250px; }
+  .more-copy { padding-top: 0; }
+  .more-canvas {
+    -webkit-mask-image: linear-gradient(180deg, #000 0, #000 200px, rgba(0, 0, 0, 0.1) 262px);
+    mask-image: linear-gradient(180deg, #000 0, #000 200px, rgba(0, 0, 0, 0.1) 262px);
+  }
+  .more-hub { width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 16px; }
+}
+.chips {
+  display: flex; flex-direction: column; gap: 10px; padding-block: 18px;
+  border-top: 1px solid var(--more-line); overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 48px, #000 calc(100% - 48px), transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0, #000 48px, #000 calc(100% - 48px), transparent 100%);
+}
+.chips-track { display: flex; width: max-content; animation: chips 80s linear infinite; }
+.chips-track.back { animation-direction: reverse; animation-duration: 95s; }
+.chips-track ul { display: flex; flex: none; gap: 10px; padding-right: 10px; }
+.chips-track li {
+  display: flex; align-items: center; gap: 9px; white-space: nowrap;
+  padding: 8px 15px 8px 13px; border-radius: 999px;
+  background: var(--more-chip); border: 1px solid var(--more-line);
+  font-weight: 600; font-size: 0.92rem; line-height: 1.3;
+}
+.chips-track li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--more-accent); }
+.chips:hover .chips-track, .chips:focus .chips-track, .more.is-paused .chips-track { animation-play-state: paused; }
+@keyframes chips { to { transform: translateX(-50%); } }
+.more-foot { display: flex; justify-content: flex-end; padding: 0 16px 14px; }
+.more-foot[hidden] { display: none; }
+.more-pause {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px;
+  background: none; border: 0; border-radius: 8px; cursor: pointer;
+  font: 500 0.75rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--more-muted);
+}
+.more-pause:hover { color: var(--more-ink); }
+.more-pause::before { content: ""; width: 8px; height: 10px; border-inline: 3px solid currentColor; box-sizing: border-box; }
+.more-pause[aria-pressed="true"]::before { width: 0; height: 0; border: 5px solid transparent; border-left: 8px solid currentColor; border-right: 0; }
+
+/* Recensioni: la sezione esiste solo se l'elenco RECENSIONI nello script contiene voci */
+.reviews { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: clamp(16px, 2.5vw, 28px); }
+.review { min-width: 0; display: flex; flex-direction: column; gap: 18px; padding: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.review blockquote { margin: 0; font-size: 1.02rem; line-height: 1.55; }
+.review blockquote::before { content: "«"; display: block; font: 800 2.4rem/0.7 var(--font-display); color: var(--accent); margin-bottom: 10px; }
+.review.is-lead { padding: 26px 0 0; margin-bottom: clamp(28px, 4vw, 44px); background: none; border: 0; border-top: 2px solid var(--ink); border-radius: 0; gap: 24px; }
+.review.is-lead blockquote { font-family: var(--font-display); font-weight: 700; font-size: clamp(1.35rem, 2.9vw, 2.1rem); line-height: 1.22; letter-spacing: -0.015em; max-width: 34ch; text-wrap: pretty; }
+.review.is-lead blockquote::before { font-size: 3.4rem; margin-bottom: 14px; }
+.review figcaption { display: flex; flex-direction: column; gap: 3px; margin-top: auto; font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
+.review-name { color: var(--ink); font-weight: 700; font-size: 1rem; }
+.review-stars { color: var(--ink); font-size: 0.95rem; letter-spacing: 0.12em; margin-bottom: 4px; }
+.review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font: 400 0.76rem var(--font-mono); letter-spacing: 0.02em; }
+.review-meta .tag { margin-top: 0; }
+.review-src { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 0.84rem; }
+.review-src a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+.review-src a:hover { color: var(--accent-strong); }
+
 /* Sicurezza */
 .sec-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px clamp(32px, 6vw, 80px); }
 @media (max-width: 720px) { .sec-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -542,7 +641,13 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   .step, .btn, .tab { transition: none; }
+  .chips { -webkit-mask-image: none; mask-image: none; padding-inline: 16px; }
+  .chips-track { animation: none; width: auto; }
+  .chips-track ul { flex-wrap: wrap; flex: 1; padding-right: 0; }
+  .chips-track ul[aria-hidden="true"] { display: none; }
 }
+[hidden] { display: none !important; }
+.nav-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 </style>
 </head>
 <body>
@@ -583,7 +688,10 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
       <a href="#collegamenti">Collegamenti</a>
       <a href="#sicurezza">Sicurezza</a>
     </div>
-    <a class="btn btn-primary btn-small" href="#demo"><span class="only-wide">Chiedi una dimostrazione</span><span class="only-narrow">Dimostrazione</span></a>
+    <div class="nav-actions">
+      <a class="btn btn-ghost btn-small" data-area-riservata hidden>Area riservata</a>
+      <a class="btn btn-primary btn-small" href="#demo"><span class="only-wide">Chiedi una dimostrazione</span><span class="only-narrow">Dimostrazione</span></a>
+    </div>
   </nav>
 </div>
 
@@ -596,6 +704,7 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
         <p class="lede">IA Connect unisce mail, gestionale e WhatsApp della tua azienda. Quando arriva una richiesta, il cliente riceve risposta, la trattativa si apre e il sollecito parte al momento giusto.</p>
         <div class="cta-row">
           <a class="btn btn-primary" href="#demo">Chiedi una dimostrazione</a>
+          <a class="btn btn-ghost" data-area-riservata hidden>Area riservata</a>
           <a class="btn btn-ghost" href="#come-funziona">Guarda come funziona</a>
         </div>
         <p class="hero-note">Dati in Unione Europea · Il numero WhatsApp resta il tuo</p>
@@ -1104,6 +1213,33 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
           <li><span class="conn-logo"><svg class="brand stripe" aria-hidden="true"><use href="#b-stripe"/></svg></span><b>Stripe</b><span>Richieste di pagamento ai tuoi clienti</span></li>
         </ul>
       </div>
+
+      <div class="more" id="altri-collegamenti">
+        <div class="more-top">
+          <canvas class="more-canvas" id="more-canvas" aria-hidden="true"></canvas>
+          <div class="more-copy">
+            <p class="more-label">Oltre l'elenco</p>
+            <p class="more-num" aria-hidden="true"><i>+</i><span id="more-count">1000</span></p>
+            <h3>…e altri 1000 ancora</h3>
+            <p>Con il collegamento universale IA Connect parla con qualsiasi gestionale, sito o servizio che espone un'API o invia notifiche automatiche: sono migliaia.</p>
+            <p class="more-note">I collegamenti non in elenco si configurano caso per caso.</p>
+          </div>
+          <div class="more-sky" aria-hidden="true">
+            <span class="more-hub" id="more-hub"><svg viewBox="0 0 32 32"><use href="#logo-mark"/></svg></span>
+          </div>
+        </div>
+        <div class="chips" role="group" aria-label="Tipi di sistemi che si possono collegare" tabindex="0">
+          <div class="chips-track">
+            <ul><li>Gestionali</li><li>CRM</li><li>Fatturazione elettronica</li><li>Negozi online</li><li>Prenotazioni</li><li>Calendari</li><li>Moduli del sito</li><li>Fogli di calcolo</li><li>Centralini</li><li>Pagamenti</li></ul>
+            <ul aria-hidden="true"><li>Gestionali</li><li>CRM</li><li>Fatturazione elettronica</li><li>Negozi online</li><li>Prenotazioni</li><li>Calendari</li><li>Moduli del sito</li><li>Fogli di calcolo</li><li>Centralini</li><li>Pagamenti</li></ul>
+          </div>
+          <div class="chips-track back">
+            <ul><li>Magazzino</li><li>Preventivi</li><li>Portali immobiliari</li><li>Newsletter</li><li>Assistenza clienti</li><li>Firma dei documenti</li><li>Database</li><li>Agende</li><li>Corrieri e spedizioni</li><li>Programmi fedeltà</li></ul>
+            <ul aria-hidden="true"><li>Magazzino</li><li>Preventivi</li><li>Portali immobiliari</li><li>Newsletter</li><li>Assistenza clienti</li><li>Firma dei documenti</li><li>Database</li><li>Agende</li><li>Corrieri e spedizioni</li><li>Programmi fedeltà</li></ul>
+          </div>
+        </div>
+        <div class="more-foot" id="more-foot" hidden><button class="more-pause" id="more-pause" type="button" aria-pressed="false">Ferma il movimento</button></div>
+      </div>
     </div>
   </section>
 
@@ -1167,6 +1303,34 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
 </footer>
 
 <script>
+// Recensioni dei clienti, mostrate nella sezione "Cosa dicono i clienti".
+// Inserire solo recensioni vere, con il consenso di chi le ha scritte.
+// Finché l'elenco è vuoto la sezione non viene creata: nessun segnaposto, nessun testo di esempio.
+// Forma di ogni voce:
+//   {
+//     testo:   'Il testo della recensione, così come è stato scritto',   (obbligatorio)
+//     nome:    'Nome e cognome di chi l'ha scritta',                      (obbligatorio)
+//     ruolo:   'Titolare',
+//     azienda: 'Nome dell'azienda',
+//     settore: 'Assicurazioni',
+//     citta:   'Genova',
+//     data:    '2026-11-12',            (anno-mese-giorno oppure anno-mese)
+//     fonte:   'Google',                (dove è stata pubblicata o come è stata raccolta, es. "mail del 12/11/2026")
+//     url:     'https://…',             (facoltativo: collegamento all'originale)
+//     voto:    5                        (facoltativo, da 1 a 5: senza questo campo le stelle non compaiono)
+//   }
+const RECENSIONI = [];
+
+// Indirizzo dell'applicazione (area riservata: accedi, registrati, area cliente e admin).
+// Finché è vuoto i pulsanti "Area riservata" restano nascosti. Esempio: "https://app.iaconnect.it"
+const AREA_RISERVATA_URL = "";
+if (/^https:\/\//.test(AREA_RISERVATA_URL)) {
+  for (const link of document.querySelectorAll("[data-area-riservata]")) {
+    link.href = AREA_RISERVATA_URL.replace(/\/$/, "") + "/area-riservata";
+    link.hidden = false;
+  }
+}
+
 (function () {
   // Schede dei casi d'uso: un solo punto di tabulazione, frecce per spostarsi
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
@@ -1219,6 +1383,339 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
     }
     msg.textContent = 'Anteprima del sito: il modulo non è ancora collegato, quindi la richiesta non è stata inviata.';
   });
+
+  // Recensioni: la sezione viene costruita solo se RECENSIONI contiene voci valide.
+  // Il testo entra sempre come textContent, mai come HTML.
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = String(text);
+    return n;
+  }
+  function clean(v) { return typeof v === 'string' ? v.trim() : ''; }
+  function reviewDate(v) {
+    var m = /^(\d{4})-(\d{2})(?:-(\d{2}))?$/.exec(v);
+    if (!m) return { text: v, iso: '' };
+    var d = new Date(Date.UTC(+m[1], +m[2] - 1, +(m[3] || 1)));
+    var opt = { month: 'long', year: 'numeric', timeZone: 'UTC' };
+    if (m[3]) opt.day = 'numeric';
+    return { text: d.toLocaleDateString('it-IT', opt), iso: v };
+  }
+  function reviewCard(r, lead) {
+    var fig = el('figure', lead ? 'review is-lead' : 'review');
+    fig.appendChild(el('blockquote', '', clean(r.testo)));
+    var cap = el('figcaption');
+    var voto = Number(r.voto);
+    if (voto >= 1 && voto <= 5 && voto === Math.round(voto)) {
+      var stars = el('span', 'review-stars', '★★★★★'.slice(0, voto) + '☆☆☆☆☆'.slice(0, 5 - voto));
+      stars.setAttribute('role', 'img');
+      stars.setAttribute('aria-label', 'Voto: ' + voto + ' su 5');
+      cap.appendChild(stars);
+    }
+    cap.appendChild(el('span', 'review-name', clean(r.nome)));
+    var who = [clean(r.ruolo), clean(r.azienda)].filter(Boolean).join(', ');
+    if (who) cap.appendChild(el('span', '', who));
+    var meta = el('span', 'review-meta');
+    if (clean(r.settore)) meta.appendChild(el('span', 'tag', clean(r.settore)));
+    if (clean(r.citta)) meta.appendChild(el('span', '', clean(r.citta)));
+    if (clean(r.data)) {
+      var d = reviewDate(clean(r.data));
+      var t = el('time', '', d.text);
+      if (d.iso) t.setAttribute('datetime', d.iso);
+      meta.appendChild(t);
+    }
+    if (meta.childNodes.length) cap.appendChild(meta);
+    var href = '';
+    try {
+      var u = new URL(clean(r.url));
+      if (u.protocol === 'https:' || u.protocol === 'http:') href = u.href;
+    } catch (err) { href = ''; }
+    if (clean(r.fonte) || href) {
+      var src = el('span', 'review-src');
+      if (clean(r.fonte)) src.appendChild(document.createTextNode('Fonte: ' + clean(r.fonte)));
+      if (href) {
+        if (clean(r.fonte)) src.appendChild(document.createTextNode(' · '));
+        var a = el('a', '', "Leggi l'originale");
+        a.href = href;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.setAttribute('aria-label', "Leggi l'originale della recensione di " + clean(r.nome) + ' (si apre in una nuova scheda)');
+        src.appendChild(a);
+      }
+      cap.appendChild(src);
+    }
+    fig.appendChild(cap);
+    return fig;
+  }
+  (function () {
+    var list = (Array.isArray(RECENSIONI) ? RECENSIONI : []).filter(function (r) {
+      return r && clean(r.testo) && clean(r.nome);
+    });
+    var before = document.getElementById('demo');
+    if (!list.length || !before) return;
+    // In evidenza la recensione più lunga; le altre restano nell'ordine dell'elenco
+    var lead = list.reduce(function (a, b) { return clean(b.testo).length > clean(a.testo).length ? b : a; });
+    var section = el('section', 'band');
+    section.id = 'recensioni';
+    var wrap = el('div', 'wrap');
+    var head = el('div', 'head');
+    head.appendChild(el('p', 'eyebrow', 'Recensioni'));
+    head.appendChild(el('h2', 'h2', 'Cosa dicono i clienti.'));
+    head.appendChild(el('p', 'lede', 'Recensioni vere, pubblicate con il consenso di chi le ha scritte. Di ognuna trovi la fonte.'));
+    var grid = el('div', 'reviews');
+    list.forEach(function (r) { if (r !== lead) grid.appendChild(reviewCard(r, false)); });
+    wrap.appendChild(head);
+    wrap.appendChild(reviewCard(lead, true));
+    if (grid.childNodes.length) wrap.appendChild(grid);
+    section.appendChild(wrap);
+    before.parentNode.insertBefore(section, before);
+  })();
+
+  // Blocco "+1000": conteggio e costellazione disegnata su canvas.
+  // Senza JavaScript o con "riduci movimento" restano il numero finale e un fotogramma fermo.
+  (function () {
+    var more = document.getElementById('altri-collegamenti');
+    var canvas = document.getElementById('more-canvas');
+    var hubEl = document.getElementById('more-hub');
+    var countEl = document.getElementById('more-count');
+    var foot = document.getElementById('more-foot');
+    var pauseBtn = document.getElementById('more-pause');
+    if (!more || !canvas || !canvas.getContext || !hubEl) return;
+    var ctx = canvas.getContext('2d');
+    var mq = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+    var TARGET = 1000;
+    var colors = { ink: '#E9F1EE', muted: '#9BAFA8', line: '#2A403A', accent: '#3FD6A2' };
+    var nodes = [], pulses = [], rings = [];
+    var w = 0, h = 0, hx = 0, hy = 0, rx = 0, ry = 0, hubR = 40;
+    var visible = false, userPaused = false, raf = 0, last = 0, clock = 0, nextPulse = 0.4, counted = false;
+
+    function readColors() {
+      var cs = getComputedStyle(more);
+      ['ink', 'muted', 'line', 'accent'].forEach(function (k) {
+        var v = cs.getPropertyValue('--more-' + k).trim();
+        if (v) colors[k] = v;
+      });
+    }
+    // Generatore con seme fisso: la costellazione è la stessa a ogni caricamento
+    function seeded(seed) {
+      return function () {
+        seed = (seed + 0x6D2B79F5) | 0;
+        var t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function build() {
+      var box = canvas.getBoundingClientRect();
+      var hub = hubEl.getBoundingClientRect();
+      w = Math.max(1, Math.round(box.width));
+      h = Math.max(1, Math.round(box.height));
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      hx = hub.left - box.left + hub.width / 2;
+      hy = hub.top - box.top + hub.height / 2;
+      hubR = hub.width / 2 + 9;
+      // Su schermi stretti il cielo sta sopra il testo: la costellazione resta nella sua fascia
+      var stacked = hubEl.parentNode.getBoundingClientRect().width > w * 0.9;
+      ry = Math.min(hy, h - hy) * (stacked ? 0.86 : 1.2);
+      rx = stacked ? w * 0.56 : Math.min(Math.max(hx, w - hx), ry * 2.2);
+      var count = w < 560 ? 28 : w < 900 ? 46 : 76;
+      var rnd = seeded(20261004);
+      nodes = [];
+      for (var i = 0; i < count; i++) {
+        var z = 0.35 + rnd() * 0.65;
+        nodes.push({
+          a: (i / count) * Math.PI * 2 + rnd() * 0.5,
+          rn: 0.3 + 0.7 * Math.sqrt(rnd()),
+          sp: (rnd() < 0.5 ? -1 : 1) * (0.006 + rnd() * 0.016),
+          ph: rnd() * Math.PI * 2,
+          fq: 0.12 + rnd() * 0.25,
+          z: z,
+          kind: rnd() < 0.16 ? 'accent' : rnd() < 0.2 ? 'ring' : 'dot',
+          x: 0, y: 0
+        });
+      }
+    }
+    function place(t) {
+      for (var i = 0; i < nodes.length; i++) {
+        var n = nodes[i];
+        var a = n.a + n.sp * t;
+        var r = n.rn + 0.035 * Math.sin(t * n.fq + n.ph);
+        n.x = hx + Math.cos(a) * rx * r;
+        n.y = hy + Math.sin(a) * ry * r;
+      }
+    }
+    function draw() {
+      place(clock);
+      ctx.clearRect(0, 0, w, h);
+      var i, n;
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = colors.line;
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        ctx.globalAlpha = 0.45 + 0.55 * n.z;
+        ctx.beginPath();
+        ctx.moveTo(n.x, n.y);
+        ctx.lineTo(hx, hy);
+        ctx.stroke();
+      }
+      for (i = 0; i < nodes.length; i++) {
+        n = nodes[i];
+        var size = 1.2 + n.z * 2.2;
+        ctx.globalAlpha = 0.4 + 0.6 * n.z;
+        ctx.beginPath();
+        if (n.kind === 'ring') {
+          ctx.arc(n.x, n.y, size + 1.5, 0, Math.PI * 2);
+          ctx.strokeStyle = colors.muted;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
+        } else {
+          ctx.arc(n.x, n.y, size, 0, Math.PI * 2);
+          ctx.fillStyle = n.kind === 'accent' ? colors.accent : colors.muted;
+          ctx.fill();
+        }
+      }
+      // Impulsi: un segnale parte da un nodo e arriva al centro
+      ctx.strokeStyle = colors.accent;
+      ctx.fillStyle = colors.accent;
+      ctx.lineCap = 'round';
+      for (i = 0; i < pulses.length; i++) {
+        var p = pulses[i];
+        n = nodes[p.node];
+        if (!n) continue;
+        var e = p.t * p.t * (3 - 2 * p.t);
+        var e0 = Math.max(0, e - 0.1);
+        var x1 = n.x + (hx - n.x) * e, y1 = n.y + (hy - n.y) * e;
+        var x0 = n.x + (hx - n.x) * e0, y0 = n.y + (hy - n.y) * e0;
+        ctx.globalAlpha = 0.9;
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(x1, y1, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.9 * (1 - p.t);
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 3 + 9 * p.t, 0, Math.PI * 2);
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+      for (i = 0; i < rings.length; i++) {
+        ctx.globalAlpha = 0.7 * (1 - rings[i].t);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(hx, hy, hubR + 4 + 22 * rings[i].t, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    function step(dt) {
+      clock += dt;
+      nextPulse -= dt;
+      if (nextPulse <= 0 && pulses.length < 6 && nodes.length) {
+        pulses.push({ node: Math.floor(Math.random() * nodes.length), t: 0, dur: 1.3 + Math.random() * 0.9 });
+        nextPulse = 0.3 + Math.random() * 0.7;
+      }
+      var i;
+      for (i = pulses.length - 1; i >= 0; i--) {
+        pulses[i].t += dt / pulses[i].dur;
+        if (pulses[i].t >= 1) { pulses.splice(i, 1); rings.push({ t: 0 }); }
+      }
+      for (i = rings.length - 1; i >= 0; i--) {
+        rings[i].t += dt / 0.9;
+        if (rings[i].t >= 1) rings.splice(i, 1);
+      }
+    }
+    function frame(now) {
+      raf = 0;
+      if (!shouldRun()) return;
+      var dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      step(dt);
+      draw();
+      raf = requestAnimationFrame(frame);
+    }
+    function drawStatic() {
+      // Fotogramma fermo: stessa costellazione, quattro impulsi a metà strada
+      clock = 14;
+      rings = [];
+      pulses = [3, 11, 19, 24].map(function (k, i) {
+        return { node: k % Math.max(1, nodes.length), t: 0.3 + i * 0.14, dur: 1 };
+      });
+      draw();
+    }
+    function shouldRun() { return visible && !document.hidden && !userPaused && !mq.matches; }
+    function update() {
+      if (shouldRun()) {
+        canvas.dataset.state = 'running';
+        if (!raf) { last = performance.now(); raf = requestAnimationFrame(frame); }
+      } else {
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+        canvas.dataset.state = mq.matches ? 'static' : 'paused';
+        if (mq.matches) drawStatic();
+      }
+      if (foot) foot.hidden = !!mq.matches;
+    }
+    function count() {
+      if (counted || !countEl) return;
+      counted = true;
+      if (mq.matches) { countEl.textContent = String(TARGET); return; }
+      var start = performance.now(), dur = 1900;
+      (function tick(now) {
+        var t = Math.min(1, (now - start) / dur);
+        var e = 1 - Math.pow(1 - t, 4);
+        countEl.textContent = String(Math.round(TARGET * e));
+        if (t < 1) requestAnimationFrame(tick);
+        else countEl.textContent = String(TARGET);
+      })(start);
+    }
+
+    readColors();
+    build();
+    if (mq.matches || !('IntersectionObserver' in window)) {
+      counted = true;
+      visible = true;
+      draw();
+      update();
+    } else {
+      countEl.textContent = '0';
+      draw();
+      new IntersectionObserver(function (entries) {
+        visible = entries[entries.length - 1].isIntersecting;
+        update();
+      }).observe(more);
+      new IntersectionObserver(function (entries, io) {
+        if (entries.some(function (en) { return en.isIntersecting; })) { io.disconnect(); count(); }
+      }, { threshold: 0.6 }).observe(countEl);
+    }
+    document.addEventListener('visibilitychange', update);
+    if (pauseBtn) {
+      pauseBtn.addEventListener('click', function () {
+        userPaused = !userPaused;
+        more.classList.toggle('is-paused', userPaused);
+        pauseBtn.setAttribute('aria-pressed', userPaused ? 'true' : 'false');
+        pauseBtn.textContent = userPaused ? 'Riprendi il movimento' : 'Ferma il movimento';
+        update();
+      });
+    }
+    function relayout() { build(); if (!raf) { if (mq.matches) drawStatic(); else draw(); } }
+    if ('ResizeObserver' in window) new ResizeObserver(relayout).observe(canvas);
+    else window.addEventListener('resize', relayout);
+    function onMotion() { if (mq.matches && countEl) { counted = true; countEl.textContent = String(TARGET); } update(); }
+    function onTheme() { readColors(); if (!raf) { if (mq.matches) drawStatic(); else draw(); } }
+    function listen(q, fn) { if (q.addEventListener) q.addEventListener('change', fn); else if (q.addListener) q.addListener(fn); }
+    if (window.matchMedia) {
+      listen(mq, onMotion);
+      listen(window.matchMedia('(prefers-color-scheme: dark)'), onTheme);
+    }
+    if ('MutationObserver' in window) {
+      new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    }
+  })();
 })();
 </script>
 </body>
