@@ -9,3 +9,7 @@ dist
 coverage
 playwright-report
 test-results
+dist
+.open-next
+.wrangler
+!apps/web/.env.production

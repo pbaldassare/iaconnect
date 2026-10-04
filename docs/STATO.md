@@ -63,7 +63,15 @@ Resta da fare, in ordine:
    Dettagli in [moduli/connettori.md](moduli/connettori.md).
 6. **Worker.** Costruire l'immagine con `apps/worker/Dockerfile` su un VPS in UE. Bloccare a livello
    di rete l'uscita verso indirizzi privati (elenco in [moduli/worker.md](moduli/worker.md)).
-7. **Interfaccia.** Pubblicare `apps/web` su un servizio che esegue Next.js, con le stesse variabili.
+7. **Pubblicazione su Cloudflare.** Due progetti distinti sullo stesso repository:
+   - **Sito di presentazione** (Cloudflare Pages): comando di build `npm run build`, cartella di
+     uscita `dist`. La configurazione è in `wrangler.jsonc` nella radice; il nome lì dentro
+     (`iaconnect`) deve coincidere con quello del progetto Pages.
+   - **Applicazione** (Cloudflare Workers, adattatore OpenNext): comando di build `npm run build:app`,
+     comando di deploy `npm run deploy:app`. Le variabili segrete (`SUPABASE_SERVICE_ROLE_KEY`,
+     `ANTHROPIC_API_KEY`, `OAUTH_STATE_SECRET`, `APP_URL` e quelle dei fornitori) vanno aggiunte nel
+     progetto Workers come segreti. In locale la build e la pagina di accesso funzionano nel motore
+     di Workers; le pagine con accesso e il connettore IMAP/SMTP lì non sono stati provati.
 
 **Nota sullo schema esposto.** L'esposizione è fatta con un'impostazione del database, non dalla
 pagina di Supabase, quindi in Project Settings → API l'elenco mostra ancora solo `public` e
