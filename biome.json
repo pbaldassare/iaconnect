@@ -8,7 +8,10 @@
       "site",
       "**/*.gen.ts",
       "apps/web/next-env.d.ts",
-      "apps/web/test/fixtures"
+      "apps/web/test/fixtures",
+      "**/.open-next",
+      "**/.wrangler",
+      "dist"
     ]
   },
   "formatter": {

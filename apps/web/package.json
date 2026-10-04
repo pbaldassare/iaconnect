@@ -7,24 +7,28 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare preview"
   },
   "dependencies": {
-    "@ia-connect/core": "*",
-    "@ia-connect/connectors": "*",
     "@ia-connect/ai": "*",
+    "@ia-connect/connectors": "*",
+    "@ia-connect/core": "*",
+    "@supabase/ssr": "^0.5.2",
+    "@supabase/supabase-js": "^2.47.0",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "@supabase/supabase-js": "^2.47.0",
-    "@supabase/ssr": "^0.5.2",
     "zod": "^4.1.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.20.8",
+    "@tailwindcss/postcss": "^4.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
-    "@tailwindcss/postcss": "^4.0.0",
-    "postcss": "^8.4.49"
+    "wrangler": "^4.147.0"
   }
 }

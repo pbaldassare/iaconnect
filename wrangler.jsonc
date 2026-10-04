@@ -1,0 +1,7 @@
+{
+  // Cloudflare Pages configuration for the presentation site (site/ → dist/).
+  // The web app is a separate Workers project: see apps/web/wrangler.jsonc.
+  "name": "iaconnect",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-09-01"
+}
