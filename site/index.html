@@ -1,0 +1,716 @@
+<title>IA Connect</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: colonna editoriale allineata a sinistra su carta a quadretti; il registro di esecuzione di un flusso è l'unico oggetto "rumoroso", tutto il resto resta quieto. */
+:root {
+  --bg: #F4F7F5;
+  --surface: #FFFFFF;
+  --surface-2: #EAF0ED;
+  --ink: #0D1F1B;
+  --muted: #53655F;
+  --line: #D6E0DB;
+  --grid: rgba(13, 31, 27, 0.045);
+  --accent: #06724F;
+  --accent-strong: #04573C;
+  --on-accent: #FFFFFF;
+  --accent-soft: #DDF3EA;
+  --ai: #855000;
+  --ai-soft: #FBEBCB;
+  --bubble: #E3F6D5;
+  --shadow: 0 1px 2px rgba(13, 31, 27, 0.05), 0 12px 32px -12px rgba(13, 31, 27, 0.18);
+
+  --font-display: "Bricolage Grotesque", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "Figtree", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --wrap: 1120px;
+  --gutter: clamp(16px, 4vw, 32px);
+  --section: clamp(64px, 9vw, 120px);
+  --radius: 14px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1513;
+    --surface: #12201D;
+    --surface-2: #182A26;
+    --ink: #E9F1EE;
+    --muted: #9BAFA8;
+    --line: #253934;
+    --grid: rgba(233, 241, 238, 0.04);
+    --accent: #3FD6A2;
+    --accent-strong: #6BE4BB;
+    --on-accent: #06231A;
+    --accent-soft: #143A2F;
+    --ai: #F2B544;
+    --ai-soft: #3A2C10;
+    --bubble: #1C4334;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1513;
+  --surface: #12201D;
+  --surface-2: #182A26;
+  --ink: #E9F1EE;
+  --muted: #9BAFA8;
+  --line: #253934;
+  --grid: rgba(233, 241, 238, 0.04);
+  --accent: #3FD6A2;
+  --accent-strong: #6BE4BB;
+  --on-accent: #06231A;
+  --accent-soft: #143A2F;
+  --ai: #F2B544;
+  --ai-soft: #3A2C10;
+  --bubble: #1C4334;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 44px 44px;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, p, ul, ol { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+
+.wrap { max-width: var(--wrap); margin-inline: auto; padding-inline: var(--gutter); }
+.band { padding-block: var(--section); }
+.band + .band { border-top: 1px solid var(--line); }
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.h2 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(1.9rem, 4.4vw, 3.1rem);
+  line-height: 1.05;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  max-width: 18ch;
+}
+.lede { color: var(--muted); font-size: 1.1rem; max-width: 60ch; }
+.head { display: flex; flex-direction: column; gap: 16px; margin-bottom: clamp(32px, 5vw, 56px); }
+.mark { color: var(--accent); }
+
+/* Navigazione */
+.nav-shell {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  z-index: 20;
+  padding-inline: var(--gutter);
+  margin-top: 12px;
+}
+.nav {
+  max-width: var(--wrap);
+  margin-inline: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 8px 8px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+}
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.1rem;
+  letter-spacing: -0.02em; text-decoration: none; white-space: nowrap;
+}
+.logo svg { flex: none; }
+.nav-links { display: flex; gap: 28px; font-size: 0.95rem; font-weight: 500; color: var(--muted); }
+.nav-links a { text-decoration: none; }
+.nav-links a:hover { color: var(--ink); }
+@media (max-width: 760px) { .nav-links { display: none; } }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 12px 22px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font: 600 1rem var(--font-body);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s, transform .15s;
+}
+.btn-primary { background: var(--accent); color: var(--on-accent); }
+.btn-primary:hover { background: var(--accent-strong); }
+.btn-ghost { background: var(--surface); color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { border-color: var(--ink); }
+.btn-small { padding: 9px 18px; font-size: 0.92rem; }
+.btn:active { transform: translateY(1px); }
+
+/* Hero */
+.hero { padding-block: clamp(48px, 7vw, 88px) var(--section); }
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: center;
+}
+@media (max-width: 960px) { .hero-grid { grid-template-columns: minmax(0, 1fr); } }
+.hero-copy { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(2.7rem, 7.2vw, 5rem);
+  line-height: 0.96;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+.hero .lede { font-size: 1.2rem; max-width: 46ch; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+.hero-note { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); letter-spacing: 0.04em; }
+
+/* Registro di esecuzione */
+.run {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.run-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem; font-weight: 600;
+}
+.run-head span:first-child { min-width: 0; }
+.pill {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent);
+  font: 500 0.72rem var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.run-steps { display: flex; flex-direction: column; }
+.step {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: start;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--line);
+  border-left: 3px solid transparent;
+  transition: background-color .3s, border-color .3s;
+}
+.step.on { background: var(--accent-soft); border-left-color: var(--accent); }
+.step.on.is-ai { background: var(--ai-soft); border-left-color: var(--ai); }
+.step time { font: 400 0.72rem var(--font-mono); color: var(--muted); padding-top: 3px; font-variant-numeric: tabular-nums; }
+.step-body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.step code { font: 600 0.82rem var(--font-mono); overflow-wrap: anywhere; }
+.step p { font-size: 0.88rem; color: var(--muted); line-height: 1.4; }
+.tag {
+  font: 500 0.66rem var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 3px 8px; border-radius: 6px; margin-top: 1px;
+  background: var(--surface-2); color: var(--muted);
+}
+.tag.ai { background: var(--ai-soft); color: var(--ai); }
+.step.on .tag:not(.ai) { background: var(--surface); }
+.run-foot {
+  display: flex; flex-wrap: wrap; gap: 6px 18px;
+  padding: 12px 18px;
+  font: 400 0.76rem var(--font-mono); color: var(--muted);
+  background: var(--surface-2);
+}
+.run-foot b { color: var(--ink); font-weight: 600; }
+@media (max-width: 480px) {
+  .step { grid-template-columns: minmax(0, 1fr) auto; }
+  .step time { display: none; }
+}
+
+/* Problema */
+.cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(24px, 4vw, 48px); }
+@media (max-width: 820px) { .cols-3 { grid-template-columns: minmax(0, 1fr); } }
+.problem { display: flex; flex-direction: column; gap: 10px; padding-top: 20px; border-top: 2px solid var(--ink); }
+.problem h3, .why h3, .sec h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; line-height: 1.2; letter-spacing: -0.01em; }
+.problem p, .why p, .sec p { color: var(--muted); font-size: 1rem; }
+
+/* Catena */
+.chain { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; counter-reset: link; }
+.link { position: relative; padding: 0 16px 0 0; display: flex; flex-direction: column; gap: 10px; counter-increment: link; }
+.link::before {
+  content: counter(link, decimal-leading-zero);
+  font: 500 0.74rem var(--font-mono); color: var(--muted); letter-spacing: 0.08em;
+}
+.node { display: flex; align-items: center; gap: 0; }
+.node i { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); flex: none; box-shadow: 0 0 0 5px var(--accent-soft); }
+.node::after { content: ""; flex: 1; height: 2px; background: var(--line); margin-left: 8px; }
+.link:last-child .node::after { background: transparent; }
+.link h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; letter-spacing: -0.01em; }
+.link p { font-size: 0.92rem; color: var(--muted); line-height: 1.45; }
+@media (max-width: 900px) {
+  .chain { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .link { padding: 0 0 28px 34px; }
+  .link::before { order: -1; }
+  .node { position: absolute; left: 0; top: 4px; bottom: 0; flex-direction: column; }
+  .node::after { width: 2px; height: auto; flex: 1; margin: 8px 0 0; }
+}
+
+/* Casi */
+.tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 28px; }
+.tab {
+  padding: 10px 18px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+  font: 600 0.95rem var(--font-body); cursor: pointer;
+}
+.tab[aria-selected="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.case { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: clamp(24px, 4vw, 56px); align-items: start; }
+@media (max-width: 860px) { .case { grid-template-columns: minmax(0, 1fr); } }
+.case-copy { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.case-copy h3 { font-family: var(--font-display); font-weight: 800; font-size: clamp(1.4rem, 3vw, 2rem); line-height: 1.1; letter-spacing: -0.02em; text-wrap: balance; }
+.case-copy > p { color: var(--muted); max-width: 56ch; }
+.flowlist { display: flex; flex-direction: column; }
+.flowlist li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 0.96rem; }
+.flowlist li span:first-child { font: 500 0.78rem var(--font-mono); color: var(--accent); letter-spacing: 0.04em; padding-top: 3px; }
+@media (max-width: 480px) { .flowlist li { grid-template-columns: minmax(0, 1fr); } }
+.phone {
+  min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
+  box-shadow: var(--shadow); padding: 18px; display: flex; flex-direction: column; gap: 10px;
+}
+.phone-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-weight: 600; font-size: 0.95rem; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font: 700 0.8rem var(--font-display); flex: none; }
+.phone-head small { display: block; font: 400 0.7rem var(--font-mono); color: var(--muted); letter-spacing: 0.03em; }
+.msg { max-width: 86%; padding: 9px 13px; border-radius: 14px; font-size: 0.92rem; line-height: 1.4; }
+.msg.out { align-self: flex-end; background: var(--bubble); border-bottom-right-radius: 4px; }
+.msg.in { align-self: flex-start; background: var(--surface-2); border-bottom-left-radius: 4px; }
+.msg small { display: block; margin-top: 4px; font: 400 0.66rem var(--font-mono); color: var(--muted); }
+
+/* Perché */
+.why-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+@media (max-width: 860px) { .why-grid { grid-template-columns: minmax(0, 1fr); } }
+.why-list { display: flex; flex-direction: column; gap: 28px; }
+.why { display: flex; flex-direction: column; gap: 8px; }
+.brief {
+  min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 22px; display: flex; flex-direction: column; gap: 18px;
+}
+.brief-label { font: 500 0.72rem var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.brief blockquote { margin: 0; font-size: 1.08rem; line-height: 1.5; padding: 14px 16px; background: var(--surface-2); border-radius: 10px; }
+.lifecycle { display: flex; flex-direction: column; }
+.lifecycle li { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 11px 0; border-top: 1px solid var(--line); font-size: 0.93rem; color: var(--muted); }
+.lifecycle li b { color: var(--ink); font-weight: 600; }
+
+/* Collegamenti */
+.conn { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.conn li {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+}
+.conn b { font-weight: 600; }
+.conn span { font-size: 0.88rem; color: var(--muted); line-height: 1.4; }
+.conn em { font: 500 0.66rem var(--font-mono); font-style: normal; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.conn em.later { color: var(--muted); }
+
+/* Sicurezza */
+.sec-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px clamp(32px, 6vw, 80px); }
+@media (max-width: 720px) { .sec-grid { grid-template-columns: minmax(0, 1fr); } }
+.sec { display: flex; flex-direction: column; gap: 8px; padding-left: 18px; border-left: 2px solid var(--accent); }
+
+/* Contatto */
+.contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); align-items: start; }
+@media (max-width: 860px) { .contact { grid-template-columns: minmax(0, 1fr); } }
+.contact .h2 { max-width: 14ch; }
+.form {
+  min-width: 0;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: clamp(20px, 3vw, 28px);
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px;
+}
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field.full, .form .btn, .form-msg { grid-column: 1 / -1; }
+@media (max-width: 520px) { .field { grid-column: 1 / -1; } }
+.field label { font-size: 0.86rem; font-weight: 600; }
+.field input, .field select, .field textarea {
+  width: 100%; padding: 11px 13px;
+  font: 400 1rem var(--font-body); color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+}
+.field textarea { resize: vertical; min-height: 88px; }
+.field input:focus, .field select:focus, .field textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.form-msg { font-size: 0.92rem; padding: 12px 14px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); }
+
+footer { border-top: 1px solid var(--line); padding-block: 32px; }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 32px; font-size: 0.86rem; color: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .step, .btn { transition: none; }
+}
+</style>
+
+<div class="nav-shell">
+  <nav class="nav" aria-label="Principale">
+    <a class="logo" href="#top">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="6" cy="13" r="4" fill="var(--accent)"/><circle cx="20" cy="6" r="3" fill="var(--ink)"/><circle cx="20" cy="20" r="3" fill="var(--ink)"/><path d="M9.5 11.5 17 7M9.5 14.5 17 19" stroke="var(--ink)" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg>
+      IA Connect
+    </a>
+    <div class="nav-links">
+      <a href="#come-funziona">Come funziona</a>
+      <a href="#casi">Casi d'uso</a>
+      <a href="#collegamenti">Collegamenti</a>
+      <a href="#sicurezza">Sicurezza</a>
+    </div>
+    <a class="btn btn-primary btn-small" href="#demo">Richiedi una demo</a>
+  </nav>
+</div>
+
+<main id="top">
+  <header class="hero wrap">
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Automazione per piccole e medie imprese</p>
+        <h1>I tuoi sistemi collegati. Il lavoro <span class="mark">parte da solo.</span></h1>
+        <p class="lede">IA Connect unisce mail, gestionale e WhatsApp della tua azienda. Quando arriva una richiesta, il cliente riceve risposta, la trattativa si apre e il sollecito parte al momento giusto.</p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#demo">Richiedi una demo</a>
+          <a class="btn btn-ghost" href="#come-funziona">Guarda come funziona</a>
+        </div>
+        <p class="hero-note">Dati in Unione Europea · Il numero WhatsApp resta il tuo</p>
+      </div>
+
+      <div class="run" aria-label="Esempio di un flusso in esecuzione">
+        <div class="run-head">
+          <span>Preventivo → WhatsApp → trattativa</span>
+          <span class="pill">Attivo</span>
+        </div>
+        <ol class="run-steps" id="run-steps">
+          <li class="step">
+            <time>09:12:04</time>
+            <div class="step-body"><code>mail.received</code><p>Arriva «Richiesta preventivo RC auto»</p></div>
+            <span class="tag">server</span>
+          </li>
+          <li class="step is-ai">
+            <time>09:12:05</time>
+            <div class="step-body"><code>ai.extract</code><p>Legge nome, targa e telefono dal testo</p></div>
+            <span class="tag ai">IA</span>
+          </li>
+          <li class="step">
+            <time>09:12:05</time>
+            <div class="step-body"><code>contact.upsert</code><p>Giulia Ferri, consenso WhatsApp registrato</p></div>
+            <span class="tag">server</span>
+          </li>
+          <li class="step">
+            <time>09:12:06</time>
+            <div class="step-body"><code>whatsapp.send_template</code><p>Invia il preventivo dal numero dell'agenzia</p></div>
+            <span class="tag">server</span>
+          </li>
+          <li class="step">
+            <time>09:12:06</time>
+            <div class="step-body"><code>deal.create</code><p>Trattativa aperta in fase «Preventivo inviato»</p></div>
+            <span class="tag">server</span>
+          </li>
+          <li class="step">
+            <time>09:12:06</time>
+            <div class="step-body"><code>wait.for_reply</code><p>Attende 48 ore, poi manda il sollecito</p></div>
+            <span class="tag">server</span>
+          </li>
+          <li class="step is-ai">
+            <time>11:40:31</time>
+            <div class="step-body"><code>ai.reply</code><p>Risponde alla domanda sulla franchigia</p></div>
+            <span class="tag ai">IA</span>
+          </li>
+        </ol>
+        <div class="run-foot"><span><b>7</b> passi</span><span><b>5</b> eseguiti dal server</span><span><b>2</b> con IA</span></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Il problema</p>
+        <h2 class="h2">Il lavoro si perde nei passaggi tra un sistema e l'altro.</h2>
+      </div>
+      <div class="cols-3">
+        <div class="problem">
+          <h3>Richieste ferme nella posta</h3>
+          <p>Il preventivo arriva via mail alle 18:40. Qualcuno lo vede il giorno dopo, quando il cliente ha già chiesto a un altro.</p>
+        </div>
+        <div class="problem">
+          <h3>Dati copiati a mano</h3>
+          <p>Nome, telefono e richiesta passano dalla mail al gestionale e poi a WhatsApp. Ogni copia costa tempo e porta errori.</p>
+        </div>
+        <div class="problem">
+          <h3>Solleciti dimenticati</h3>
+          <p>Il cliente non risponde e nessuno lo richiama. La trattativa resta aperta per settimane senza che nessuno la segua.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="come-funziona">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Come funziona</p>
+        <h2 class="h2">Dall'evento al report, in sei passaggi.</h2>
+        <p class="lede">Ogni flusso segue la stessa catena. Tu decidi cosa succede a ogni passaggio, la piattaforma lo ripete ogni volta allo stesso modo.</p>
+      </div>
+      <ol class="chain">
+        <li class="link"><div class="node"><i></i></div><h3>Evento</h3><p>Una mail, un ordine, un nuovo annuncio su un portale.</p></li>
+        <li class="link"><div class="node"><i></i></div><h3>Comprensione</h3><p>I dati utili vengono letti e messi in ordine.</p></li>
+        <li class="link"><div class="node"><i></i></div><h3>Azione</h3><p>Contatto registrato, messaggio inviato, gestionale aggiornato.</p></li>
+        <li class="link"><div class="node"><i></i></div><h3>Conversazione</h3><p>Il cliente risponde e riceve risposta, anche fuori orario.</p></li>
+        <li class="link"><div class="node"><i></i></div><h3>Trattativa</h3><p>Ogni richiesta diventa una trattativa con fase e prossima azione.</p></li>
+        <li class="link"><div class="node"><i></i></div><h3>Report</h3><p>Vedi quante richieste, quante risposte, quanti contratti.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="band" id="casi">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Casi d'uso</p>
+        <h2 class="h2">Un solo motore, configurato per il tuo settore.</h2>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="Settori">
+        <button class="tab" role="tab" id="tab-ins" aria-controls="case-ins" aria-selected="true">Assicurazioni</button>
+        <button class="tab" role="tab" id="tab-eco" aria-controls="case-eco" aria-selected="false" tabindex="-1">E-commerce</button>
+        <button class="tab" role="tab" id="tab-imm" aria-controls="case-imm" aria-selected="false" tabindex="-1">Immobiliare</button>
+      </div>
+
+      <div class="case" role="tabpanel" id="case-ins" aria-labelledby="tab-ins">
+        <div class="case-copy">
+          <h3>Il preventivo arriva su WhatsApp pochi secondi dopo la richiesta.</h3>
+          <p>La richiesta entra dalla mail o dal sito. Il cliente riceve il preventivo, fa le sue domande e, se non risponde, viene sollecitato dopo due giorni.</p>
+          <ul class="flowlist">
+            <li><span>Richiesta</span><span>Mail con i dati del veicolo e del contraente</span></li>
+            <li><span>Invio</span><span>Preventivo su WhatsApp dal numero dell'agenzia</span></li>
+            <li><span>Risposte</span><span>Domande su franchigia, garanzie e scadenze</span></li>
+            <li><span>Sollecito</span><span>Dopo 48 ore senza risposta</span></li>
+            <li><span>Report</span><span>Preventivi inviati, risposte, polizze chiuse</span></li>
+          </ul>
+        </div>
+        <div class="phone">
+          <div class="phone-head"><span class="avatar">AF</span><span>Agenzia Ferri<small>WhatsApp · numero dell'agenzia</small></span></div>
+          <p class="msg out">Buongiorno Giulia, ecco il preventivo RC auto per la sua Panda: 412 € l'anno. Questo è un messaggio automatico dell'Agenzia Ferri.<small>09:12</small></p>
+          <p class="msg in">Grazie. La franchigia sui cristalli quant'è?<small>11:40</small></p>
+          <p class="msg out">La garanzia cristalli ha una franchigia di 150 € per sinistro. Vuole che la richiami un consulente?<small>11:40</small></p>
+        </div>
+      </div>
+
+      <div class="case" role="tabpanel" id="case-eco" aria-labelledby="tab-eco" hidden>
+        <div class="case-copy">
+          <h3>Il cliente chiede dov'è il suo ordine e riceve la risposta giusta.</h3>
+          <p>Ogni ordine viene registrato e collegato al contatto. Le domande sullo stato trovano risposta leggendo i dati veri del tuo negozio.</p>
+          <ul class="flowlist">
+            <li><span>Ordine</span><span>Mail di conferma dal negozio online</span></li>
+            <li><span>Registrazione</span><span>Ordine e contatto salvati insieme</span></li>
+            <li><span>Contatto</span><span>Conferma su WhatsApp con numero d'ordine</span></li>
+            <li><span>Risposte</span><span>Stato della spedizione letto dal database</span></li>
+            <li><span>Report</span><span>Ordini seguiti e richieste risolte senza operatore</span></li>
+          </ul>
+        </div>
+        <div class="phone">
+          <div class="phone-head"><span class="avatar">BV</span><span>Bottega Verde Oliva<small>WhatsApp · numero del negozio</small></span></div>
+          <p class="msg out">Ciao Marco, abbiamo ricevuto il tuo ordine n. 2841. Questo è un messaggio automatico di Bottega Verde Oliva.<small>15:02</small></p>
+          <p class="msg in">Quando arriva?<small>18:27</small></p>
+          <p class="msg out">Il pacco è partito oggi con corriere espresso. La consegna è prevista giovedì 8 ottobre.<small>18:27</small></p>
+        </div>
+      </div>
+
+      <div class="case" role="tabpanel" id="case-imm" aria-labelledby="tab-imm" hidden>
+        <div class="case-copy">
+          <h3>Il nuovo immobile arriva subito a chi lo stava cercando.</h3>
+          <p>Quando un annuncio compare sui portali viene confrontato con le richieste dei tuoi clienti. Chi è interessato riceve la proposta e può fissare la visita.</p>
+          <ul class="flowlist">
+            <li><span>Annuncio</span><span>Nuovo immobile pubblicato su un portale</span></li>
+            <li><span>Abbinamento</span><span>Zona, prezzo e metratura contro le richieste</span></li>
+            <li><span>Messaggio</span><span>Proposta ai clienti interessati</span></li>
+            <li><span>Visita</span><span>Appuntamento fissato in calendario</span></li>
+            <li><span>Trattativa</span><span>Proposta, controproposta, chiusura</span></li>
+          </ul>
+        </div>
+        <div class="phone">
+          <div class="phone-head"><span class="avatar">SC</span><span>Studio Casa Levante<small>WhatsApp · numero dell'agenzia</small></span></div>
+          <p class="msg out">Buongiorno Elena, è appena uscito un trilocale di 85 m² in zona Foce a 248.000 €. Messaggio automatico di Studio Casa Levante.<small>10:05</small></p>
+          <p class="msg in">Interessante. Si può vedere sabato?<small>10:31</small></p>
+          <p class="msg out">Sabato sono liberi gli orari delle 10:00 e delle 11:30. Quale preferisce?<small>10:31</small></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Perché IA Connect</p>
+        <h2 class="h2">L'IA progetta il flusso. Il server lo esegue.</h2>
+      </div>
+      <div class="why-grid">
+        <div class="why-list">
+          <div class="why">
+            <h3>Costi prevedibili</h3>
+            <p>L'IA lavora quando crei un flusso e nei soli passaggi in cui serve capire un testo o rispondere a una persona. Tutto il resto è codice collaudato che gira sul server, uguale a ogni esecuzione.</p>
+          </div>
+          <div class="why">
+            <h3>Gestisci tutto da solo</h3>
+            <p>Colleghi i tuoi sistemi con una procedura guidata e modifichi i flussi quando vuoi. Il nostro supporto può intervenire sul tuo account, e ogni suo accesso resta visibile nel registro.</p>
+          </div>
+          <div class="why">
+            <h3>Provi prima di attivare</h3>
+            <p>Ogni flusso gira in simulazione sulle tue richieste recenti. Vedi l'esito passo per passo e nessun messaggio parte davvero.</p>
+          </div>
+          <div class="why">
+            <h3>L'operatore entra quando serve</h3>
+            <p>Le risposte automatiche restano nell'ambito del tuo lavoro. Fuori ambito, o dopo un numero fissato di scambi, la conversazione passa a una persona.</p>
+          </div>
+        </div>
+
+        <div class="brief">
+          <p class="brief-label">Scrivi cosa ti serve</p>
+          <blockquote>Quando arriva una richiesta di preventivo via mail, manda il preventivo su WhatsApp. Se il cliente non risponde entro due giorni, sollecitalo.</blockquote>
+          <ol class="lifecycle">
+            <li><b>Proposta</b><span>L'assistente compone il flusso con i blocchi disponibili e chiede ciò che manca.</span></li>
+            <li><b>Controllo</b><span>Verifica collegamenti, consensi dei contatti e limiti del piano.</span></li>
+            <li><b>Simulazione</b><span>Prova sulle richieste reali degli ultimi giorni, senza invii.</span></li>
+            <li><b>Attivazione</b><span>Il flusso parte. Ogni modifica crea una versione che puoi ripristinare.</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="collegamenti">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Collegamenti</p>
+        <h2 class="h2">Si collega a ciò che usi già.</h2>
+        <p class="lede">Partiamo dal settore assicurativo con mail, WhatsApp e gestionale. Gli altri collegamenti arrivano nelle fasi successive.</p>
+      </div>
+      <ul class="conn">
+        <li><em>Dal primo rilascio</em><b>Gmail</b><span>Lettura delle richieste e invio dal tuo indirizzo</span></li>
+        <li><em>Dal primo rilascio</em><b>Microsoft 365</b><span>Posta di Outlook ed Exchange</span></li>
+        <li><em>Dal primo rilascio</em><b>IMAP e SMTP</b><span>Qualsiasi altra casella di posta</span></li>
+        <li><em>Dal primo rilascio</em><b>WhatsApp</b><span>Messaggi dal numero della tua azienda</span></li>
+        <li><em>Dal primo rilascio</em><b>Gestionale</b><span>Lettura e scrittura dei dati dei clienti</span></li>
+        <li><em class="later">In arrivo</em><b>Siti e portali</b><span>Novità lette a orari fissi</span></li>
+        <li><em class="later">In arrivo</em><b>Calendario</b><span>Appuntamenti e visite</span></li>
+        <li><em class="later">In arrivo</em><b>Facebook e Instagram</b><span>Contatti, messaggi e commenti</span></li>
+        <li><em class="later">In arrivo</em><b>SMS</b><span>Avvisi e solleciti</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="band" id="sicurezza">
+    <div class="wrap">
+      <div class="head">
+        <p class="eyebrow">Sicurezza e GDPR</p>
+        <h2 class="h2">I dati dei tuoi clienti restano tuoi.</h2>
+      </div>
+      <div class="sec-grid">
+        <div class="sec"><h3>Dati in Unione Europea</h3><p>Database e archivi si trovano in UE. Tu sei il titolare del trattamento, noi il responsabile.</p></div>
+        <div class="sec"><h3>Aziende isolate</h3><p>Ogni azienda vede solo i propri dati. L'isolamento è verificato da test automatici a ogni rilascio.</p></div>
+        <div class="sec"><h3>Consenso per canale</h3><p>Nessun messaggio parte senza un consenso valido, registrato con data e origine sulla scheda del contatto.</p></div>
+        <div class="sec"><h3>Credenziali cifrate</h3><p>Le chiavi dei tuoi sistemi sono cifrate e non compaiono mai nell'interfaccia né nei registri.</p></div>
+        <div class="sec"><h3>Registro delle azioni</h3><p>Ogni azione di utenti, supporto e automazioni viene registrata e non può essere modificata.</p></div>
+        <div class="sec"><h3>Chi scrive è dichiarato</h3><p>Il destinatario sa sempre di parlare con un sistema automatico. Puoi esportare o cancellare i dati di un contatto in qualsiasi momento.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="demo">
+    <div class="wrap contact">
+      <div class="head">
+        <p class="eyebrow">Richiedi una demo</p>
+        <h2 class="h2">Raccontaci come lavori oggi.</h2>
+        <p class="lede">In mezz'ora ti mostriamo un flusso costruito sul tuo caso: da dove arrivano le richieste, cosa riceve il cliente, cosa vedi nel report.</p>
+      </div>
+      <form class="form" id="demo-form" novalidate>
+        <div class="field"><label for="f-name">Nome e cognome</label><input id="f-name" name="name" autocomplete="name" required></div>
+        <div class="field"><label for="f-company">Azienda</label><input id="f-company" name="company" autocomplete="organization" required></div>
+        <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" autocomplete="email" required></div>
+        <div class="field"><label for="f-sector">Settore</label>
+          <select id="f-sector" name="sector">
+            <option>Assicurazioni</option><option>E-commerce</option><option>Immobiliare</option><option>Altro</option>
+          </select>
+        </div>
+        <div class="field full"><label for="f-note">Cosa vorresti automatizzare?</label><textarea id="f-note" name="note"></textarea></div>
+        <button class="btn btn-primary" type="submit">Invia la richiesta</button>
+        <p class="form-msg" id="form-msg" role="status" hidden></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>IA Connect · Piattaforma in sviluppo, primo rilascio nel settore assicurativo</span>
+    <span>Dati trattati in Unione Europea</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  // Schede dei casi d'uso
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      var next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+      select(next); next.focus();
+    });
+  });
+
+  // Registro di esecuzione: evidenzia i passi in sequenza
+  var steps = Array.prototype.slice.call(document.querySelectorAll('#run-steps .step'));
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (steps.length && !reduce) {
+    var at = 0;
+    steps[0].classList.add('on');
+    setInterval(function () {
+      steps[at].classList.remove('on');
+      at = (at + 1) % steps.length;
+      steps[at].classList.add('on');
+    }, 1400);
+  }
+
+  // Modulo: in questa anteprima non è collegato a nessun servizio
+  var form = document.getElementById('demo-form');
+  var msg = document.getElementById('form-msg');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    msg.hidden = false;
+    if (!form.checkValidity()) {
+      msg.textContent = 'Inserisci nome, azienda e un indirizzo email valido.';
+      return;
+    }
+    msg.textContent = 'Anteprima del sito: il modulo non è ancora collegato, quindi la richiesta non è stata inviata.';
+  });
+})();
+</script>
