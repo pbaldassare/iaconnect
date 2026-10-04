@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "zod": "npm:zod@^4",
+    "@ia-connect/core": "../../packages/core/src/index.ts"
+  }
+}
