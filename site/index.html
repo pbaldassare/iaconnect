@@ -47,6 +47,7 @@
   --gutter: clamp(16px, 4vw, 32px);
   --section: clamp(64px, 9vw, 120px);
   --radius: 14px;
+  --photo-filter: none;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -67,6 +68,7 @@
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
     --logo-tile: #0A8A60;
     color-scheme: dark;
+    --photo-filter: brightness(0.84);
   }
 }
 :root[data-theme="dark"] {
@@ -87,6 +89,7 @@
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
   --logo-tile: #0A8A60;
   color-scheme: dark;
+  --photo-filter: brightness(0.84);
 }
 
 * { box-sizing: border-box; }
@@ -303,6 +306,14 @@ a { color: inherit; }
   .step time { display: none; }
 }
 
+/* Fotografie: stesso trattamento ovunque (bordo dai token, angoli delle altre superfici, meno luce nel tema scuro) */
+.photo { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+.photo img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; filter: var(--photo-filter); }
+.photo.is-wide img { aspect-ratio: 3 / 2; }
+.head-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr); gap: clamp(24px, 4vw, 56px); align-items: end; }
+.head-text { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+@media (max-width: 820px) { .head-split { grid-template-columns: minmax(0, 1fr); } }
+
 /* Problema */
 .cols-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(24px, 4vw, 48px); }
 @media (max-width: 820px) { .cols-3 { grid-template-columns: minmax(0, 1fr); } }
@@ -440,6 +451,9 @@ a { color: inherit; }
 .flowlist li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 4px 16px; padding: 12px 0; border-top: 1px solid var(--line); font-size: 0.96rem; }
 .flowlist li span:first-child { font: 500 0.78rem var(--font-mono); color: var(--accent); letter-spacing: 0.04em; padding-top: 3px; }
 @media (max-width: 480px) { .flowlist li { grid-template-columns: minmax(0, 1fr); } }
+.case-media { min-width: 0; display: flex; flex-direction: column; }
+.case-media .phone { position: relative; margin: -44px 20px 0; }
+@media (max-width: 480px) { .case-media .phone { margin: -28px 10px 0; } }
 .phone {
   min-width: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
@@ -649,9 +663,12 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
 
   <section class="band">
     <div class="wrap">
-      <div class="head">
-        <p class="eyebrow">Il problema</p>
-        <h2 class="h2">Il lavoro si perde nei passaggi tra un sistema e l'altro.</h2>
+      <div class="head head-split">
+        <div class="head-text">
+          <p class="eyebrow">Il problema</p>
+          <h2 class="h2">Il lavoro si perde nei passaggi tra un sistema e l'altro.</h2>
+        </div>
+        <figure class="photo is-wide"><img src="assets/photos/titolare-telefono-portatile.jpg" alt="Un uomo di spalle al tavolo di un locale, con il portatile aperto e il telefono in mano" width="1200" height="800" loading="lazy" decoding="async"></figure>
       </div>
       <div class="cols-3">
         <div class="problem">
@@ -862,11 +879,14 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Preventivi inviati, risposte, polizze chiuse</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">AF</span><span>Agenzia Ferri<small>WhatsApp · dal numero dell'agenzia</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg out">Buongiorno Giulia, questo è un messaggio automatico dell'Agenzia Ferri. Ecco il preventivo RC auto per la sua Panda: 412 € l'anno.<small>09:12 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Grazie. La franchigia sui cristalli quant'è?<small>11:40</small></p>
-          <p class="msg out">La garanzia cristalli ha una franchigia di 150 € per sinistro. Vuole che la richiami un consulente?<small>11:40 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/assicurazioni-consulenza-documenti.jpg" alt="Due persone a un tavolo scorrono insieme le pagine di un modulo; accanto, una penna e un telefono" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">AF</span><span>Agenzia Ferri<small>WhatsApp · dal numero dell'agenzia</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg out">Buongiorno Giulia, questo è un messaggio automatico dell'Agenzia Ferri. Ecco il preventivo RC auto per la sua Panda: 412 € l'anno.<small>09:12 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Grazie. La franchigia sui cristalli quant'è?<small>11:40</small></p>
+            <p class="msg out">La garanzia cristalli ha una franchigia di 150 € per sinistro. Vuole che la richiami un consulente?<small>11:40 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -882,11 +902,14 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Ordini seguiti e richieste risolte senza operatore</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">BO</span><span>Bottega dell'Olivo<small>WhatsApp · dal numero del negozio</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg out">Ciao Marco, questo è un messaggio automatico di Bottega dell'Olivo. Abbiamo ricevuto il tuo ordine n. 2841.<small>15:02 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Quando arriva?<small>18:27</small></p>
-          <p class="msg out">Il pacco è partito oggi con corriere espresso. La consegna è prevista giovedì 8 ottobre.<small>18:27 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/ecommerce-pacco-ordine.jpg" alt="Mani che chiudono con il nastro adesivo un pacco in carta da spedire" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">BO</span><span>Bottega dell'Olivo<small>WhatsApp · dal numero del negozio</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg out">Ciao Marco, questo è un messaggio automatico di Bottega dell'Olivo. Abbiamo ricevuto il tuo ordine n. 2841.<small>15:02 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Quando arriva?<small>18:27</small></p>
+            <p class="msg out">Il pacco è partito oggi con corriere espresso. La consegna è prevista giovedì 8 ottobre.<small>18:27 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -902,13 +925,16 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Trattativa</span><span>Aperta con il valore dell'immobile e la prossima azione</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">CL</span><span>Studio Casa Levante<small>WhatsApp · dal numero dell'agenzia</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg out">Buongiorno Elena, questo è un messaggio automatico di Studio Casa Levante. È appena uscito un trilocale di 85 m² in zona Foce a 248.000 €, dentro la cifra che ci aveva indicato.<small>10:05 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Interessante. Si può vedere sabato?<small>10:31</small></p>
-          <p class="msg out">Sabato sono liberi gli orari delle 10:00 e delle 11:30. Quale preferisce?<small>10:31 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
-          <p class="msg in">Alle 10:00.<small>10:33</small></p>
-          <p class="msg out">Visita fissata per sabato alle 10:00. Venerdì le arriva il promemoria con l'indirizzo.<small>10:33 · <b>messaggio automatico</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/immobiliare-chiavi-casa.jpg" alt="Una mano tiene un mazzo di chiavi all'ingresso di un appartamento luminoso" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">CL</span><span>Studio Casa Levante<small>WhatsApp · dal numero dell'agenzia</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg out">Buongiorno Elena, questo è un messaggio automatico di Studio Casa Levante. È appena uscito un trilocale di 85 m² in zona Foce a 248.000 €, dentro la cifra che ci aveva indicato.<small>10:05 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Interessante. Si può vedere sabato?<small>10:31</small></p>
+            <p class="msg out">Sabato sono liberi gli orari delle 10:00 e delle 11:30. Quale preferisce?<small>10:31 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+            <p class="msg in">Alle 10:00.<small>10:33</small></p>
+            <p class="msg out">Visita fissata per sabato alle 10:00. Venerdì le arriva il promemoria con l'indirizzo.<small>10:33 · <b>messaggio automatico</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -924,12 +950,15 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Appuntamenti fissati, spostati e mancati</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">CA</span><span>Centro Estetico Aurora<small>WhatsApp · dal numero del centro</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg in">Buonasera, vorrei prenotare un trattamento viso la prossima settimana.<small>20:47</small></p>
-          <p class="msg out">Buonasera Paola, questo è un messaggio automatico del Centro Estetico Aurora. Martedì 13 ottobre sono liberi gli orari delle 9:30 e delle 16:00. Quale preferisce?<small>20:47 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Martedì alle 16:00.<small>20:52</small></p>
-          <p class="msg out">Confermato: martedì 13 ottobre alle 16:00. Lunedì le mandiamo un promemoria.<small>20:52 · <b>messaggio automatico</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/centro-estetico-reception.jpg" alt="Interno di un salone con le poltrone in fila e, sullo sfondo, una persona al banco della reception" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">CA</span><span>Centro Estetico Aurora<small>WhatsApp · dal numero del centro</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg in">Buonasera, vorrei prenotare un trattamento viso la prossima settimana.<small>20:47</small></p>
+            <p class="msg out">Buonasera Paola, questo è un messaggio automatico del Centro Estetico Aurora. Martedì 13 ottobre sono liberi gli orari delle 9:30 e delle 16:00. Quale preferisce?<small>20:47 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Martedì alle 16:00.<small>20:52</small></p>
+            <p class="msg out">Confermato: martedì 13 ottobre alle 16:00. Lunedì le mandiamo un promemoria.<small>20:52 · <b>messaggio automatico</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -945,12 +974,15 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Preventivi inviati, appuntamenti, lavori eseguiti</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">AC</span><span>Autofficina Colombo<small>WhatsApp · dal numero dell'officina</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg in">Buongiorno, quanto costa il tagliando per una Fiat 500 del 2019?<small>08:15</small></p>
-          <p class="msg out">Buongiorno Davide, questo è un messaggio automatico dell'Autofficina Colombo. Il tagliando per la sua 500 costa 189 €, olio e filtri compresi. Vuole fissare un appuntamento?<small>08:15 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Sì, giovedì mattina se possibile.<small>08:22</small></p>
-          <p class="msg out">Giovedì alle 8:30 c'è posto, l'ho segnato. La revisione della sua auto scade a novembre: possiamo farla lo stesso giorno.<small>08:22 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/officina-meccanico.jpg" alt="Un meccanico al banco di lavoro in una piccola officina, tra attrezzi e pneumatici" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">AC</span><span>Autofficina Colombo<small>WhatsApp · dal numero dell'officina</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg in">Buongiorno, quanto costa il tagliando per una Fiat 500 del 2019?<small>08:15</small></p>
+            <p class="msg out">Buongiorno Davide, questo è un messaggio automatico dell'Autofficina Colombo. Il tagliando per la sua 500 costa 189 €, olio e filtri compresi. Vuole fissare un appuntamento?<small>08:15 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Sì, giovedì mattina se possibile.<small>08:22</small></p>
+            <p class="msg out">Giovedì alle 8:30 c'è posto, l'ho segnato. La revisione della sua auto scade a novembre: possiamo farla lo stesso giorno.<small>08:22 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -966,11 +998,14 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Richieste arrivate, pratiche complete, incontri fatti</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">SB</span><span>Studio Bernardi, commercialisti<small>WhatsApp · dal numero dello studio</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg out">Buongiorno Laura, questo è un messaggio automatico dello Studio Bernardi. Abbiamo ricevuto la sua richiesta dal sito. Per il primo incontro servono l'ultima dichiarazione dei redditi e la visura camerale.<small>09:30 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">La dichiarazione ve la mando oggi. La visura devo ancora chiederla.<small>09:48</small></p>
-          <p class="msg out">Va bene. L'incontro è fissato per lunedì 12 ottobre alle 15:00. Venerdì le ricordiamo la visura, se non è ancora arrivata.<small>09:48 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/studio-professionale-conti.jpg" alt="Mani su una scrivania con calcolatrice, taccuino e fogli di conti davanti a un portatile" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">SB</span><span>Studio Bernardi, commercialisti<small>WhatsApp · dal numero dello studio</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg out">Buongiorno Laura, questo è un messaggio automatico dello Studio Bernardi. Abbiamo ricevuto la sua richiesta dal sito. Per il primo incontro servono l'ultima dichiarazione dei redditi e la visura camerale.<small>09:30 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">La dichiarazione ve la mando oggi. La visura devo ancora chiederla.<small>09:48</small></p>
+            <p class="msg out">Va bene. L'incontro è fissato per lunedì 12 ottobre alle 15:00. Venerdì le ricordiamo la visura, se non è ancora arrivata.<small>09:48 · <b class="by-ai">risposta automatica dell'IA</b></small></p>
+          </div>
         </div>
       </div>
 
@@ -986,12 +1021,15 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
             <li><span>Risultati</span><span>Richieste arrivate, proposte inviate, prenotazioni confermate</span></li>
           </ul>
         </div>
-        <div class="phone">
-          <div class="phone-head"><span class="avatar" aria-hidden="true">AB</span><span>Albergo Belvedere<small>WhatsApp · dal numero dell'albergo</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
-          <p class="msg in">Buonasera, avete una doppia dal 23 al 25 ottobre?<small>21:10</small></p>
-          <p class="msg out">Buonasera Chiara, questo è un messaggio automatico dell'Albergo Belvedere. Dal 23 al 25 ottobre è libera una doppia con colazione a 96 € a notte. Vuole che gliela teniamo da parte?<small>21:10 · <b>messaggio automatico</b></small></p>
-          <p class="msg in">Sì, grazie.<small>21:14</small></p>
-          <p class="msg out">La camera è riservata a suo nome fino a domani alle 12:00. Le abbiamo mandato per mail il riepilogo per confermare.<small>21:14 · <b>messaggio automatico</b></small></p>
+        <div class="case-media">
+          <figure class="photo"><img src="assets/photos/hotel-reception.jpg" alt="La reception di un albergo con il banco in legno e un addetto di profilo" width="1100" height="619" loading="lazy" decoding="async"></figure>
+          <div class="phone">
+            <div class="phone-head"><span class="avatar" aria-hidden="true">AB</span><span>Albergo Belvedere<small>WhatsApp · dal numero dell'albergo</small></span><svg class="brand whatsapp" aria-hidden="true"><use href="#b-whatsapp"/></svg></div>
+            <p class="msg in">Buonasera, avete una doppia dal 23 al 25 ottobre?<small>21:10</small></p>
+            <p class="msg out">Buonasera Chiara, questo è un messaggio automatico dell'Albergo Belvedere. Dal 23 al 25 ottobre è libera una doppia con colazione a 96 € a notte. Vuole che gliela teniamo da parte?<small>21:10 · <b>messaggio automatico</b></small></p>
+            <p class="msg in">Sì, grazie.<small>21:14</small></p>
+            <p class="msg out">La camera è riservata a suo nome fino a domani alle 12:00. Le abbiamo mandato per mail il riepilogo per confermare.<small>21:14 · <b>messaggio automatico</b></small></p>
+          </div>
         </div>
       </div>
     </div>
@@ -1123,6 +1161,7 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
       <span>Dati trattati in Unione Europea</span>
       <span>Schermate e conversazioni sono illustrazioni con dati inventati.</span>
       <span>I marchi citati appartengono ai rispettivi proprietari.</span>
+      <span>Fotografie di repertorio da Unsplash: non ritraggono clienti di IA Connect. Autori: Joseph Frank, Olena Kholina, Compagnons, Jakub Żerdzicki, Giorgio Trovato, Kato Blackmore, Zoshua Colah (<a href="assets/photos/CREDITS.md">crediti</a>).</span>
     </div>
   </div>
 </footer>
