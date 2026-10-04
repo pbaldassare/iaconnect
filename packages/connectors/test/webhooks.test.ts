@@ -85,9 +85,11 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
     config: { phoneNumberId: PHONE_NUMBER_ID },
   });
   const accounts = { [`whatsapp_meta:${PHONE_NUMBER_ID}`]: [acme] };
+  // Every connection the server completed has its secrets in the Vault.
+  const secrets = { "conn-acme": { accessToken: "EAAG-acme" } };
 
   it("answers Meta's GET handshake with the challenge", async () => {
-    const { deps, stored } = fakeDeps({ accounts });
+    const { deps, stored } = fakeDeps({ accounts, secrets });
     const url = `${BASE}/p/whatsapp_meta?hub.mode=subscribe&hub.verify_token=verify-me&hub.challenge=1158201444`;
     const response = await handleInboundWebhook(new Request(url), deps);
     expect(response.status).toBe(200);
@@ -96,7 +98,7 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
   });
 
   it("refuses the handshake with a wrong verify token, with no detail", async () => {
-    const { deps } = fakeDeps({ accounts });
+    const { deps } = fakeDeps({ accounts, secrets });
     const url = `${BASE}/p/whatsapp_meta?hub.mode=subscribe&hub.verify_token=guess&hub.challenge=1158201444`;
     const response = await handleInboundWebhook(new Request(url), deps);
     expect(response.status).toBe(401);
@@ -104,7 +106,7 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
   });
 
   it("stores the events of a signed delivery for the connection that owns the number", async () => {
-    const { deps, stored } = fakeDeps({ accounts });
+    const { deps, stored } = fakeDeps({ accounts, secrets });
     const response = await handleInboundWebhook(metaPost(whatsappInboundPayload), deps);
     expect(response.status).toBe(200);
     expect(stored).toHaveLength(1);
@@ -120,7 +122,7 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
   });
 
   it("stores nothing and looks nothing up when the signature is rejected", async () => {
-    const { deps, stored, lookups } = fakeDeps({ accounts });
+    const { deps, stored, lookups } = fakeDeps({ accounts, secrets });
     const response = await handleInboundWebhook(metaPost(whatsappInboundPayload, "attacker-secret"), deps);
     expect(response.status).toBe(401);
     expect(await response.text()).toBe("");
@@ -129,7 +131,7 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
   });
 
   it("keeps dedupe keys stable across redelivery, so nothing is stored twice", async () => {
-    const { deps, stored } = fakeDeps({ accounts });
+    const { deps, stored } = fakeDeps({ accounts, secrets });
     for (let attempt = 0; attempt < 3; attempt++) {
       expect((await handleInboundWebhook(metaPost(whatsappInboundPayload), deps)).status).toBe(200);
       expect((await handleInboundWebhook(metaPost(whatsappStatusPayload), deps)).status).toBe(200);
@@ -164,7 +166,7 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
   });
 
   it("answers 500 without detail when storing fails, so the provider redelivers", async () => {
-    const { deps } = fakeDeps({ accounts });
+    const { deps } = fakeDeps({ accounts, secrets });
     deps.insertEvents = async () => {
       throw new Error("database down: secret detail");
     };
@@ -173,8 +175,59 @@ describe("handleInboundWebhook: provider route (/p/<connector_key>)", () => {
     expect(await response.text()).toBe("");
   });
 
+  it("never delivers to a connection without stored secrets, whatever account id it carries", async () => {
+    // What a manager could insert by hand before connections became server-written: the
+    // victim's phone number id, no token (none is needed to receive).
+    const squatter = connection("conn-squatter", "org-attacker", "whatsapp_meta", {
+      config: { phoneNumberId: PHONE_NUMBER_ID },
+    });
+    const { deps, stored } = fakeDeps({
+      accounts: { [`whatsapp_meta:${PHONE_NUMBER_ID}`]: [squatter, acme] },
+      secrets,
+    });
+    const response = await handleInboundWebhook(metaPost(whatsappInboundPayload), deps);
+    expect(response.status).toBe(200);
+    expect(stored.map((row) => row.organizationId)).toEqual(["org-acme"]);
+  });
+
+  it("serves the other connections and answers 200 when one connection's handler fails", async () => {
+    const pageId = "112233445566778";
+    const body = {
+      object: "page",
+      entry: [
+        {
+          id: pageId,
+          time: 1759651200000,
+          messaging: [
+            {
+              sender: { id: "5551234" },
+              recipient: { id: pageId },
+              timestamp: 1759651200000,
+              message: { mid: "m_abc", text: "Buongiorno" },
+            },
+          ],
+        },
+      ],
+    };
+    // Broken: secrets exist but the page id is missing from the configuration, so the handler throws.
+    const broken = connection("conn-broken", "org-broken", "meta_social", { config: {} });
+    const good = connection("conn-good", "org-good", "meta_social", { config: { pageId } });
+    const { deps, stored } = fakeDeps({
+      accounts: { [`meta_social:${pageId}`]: [broken, good] },
+      secrets: {
+        "conn-broken": { pageAccessToken: "EAAG-broken" },
+        "conn-good": { pageAccessToken: "EAAG-good" },
+      },
+    });
+    const response = await handleInboundWebhook(metaPost(body, "meta-app-secret", "/p/meta_social"), deps);
+    expect(response.status).toBe(200);
+    expect(stored.map((row) => [row.connectionId, row.event.type])).toEqual([
+      ["conn-good", "social.message.received"],
+    ]);
+  });
+
   it("answers 404 for unknown connectors and for connectors without a provider-level webhook", async () => {
-    const { deps } = fakeDeps({ accounts });
+    const { deps } = fakeDeps({ accounts, secrets });
     for (const path of [
       "/p/unknown",
       "/p/webhook_inbound",

@@ -7,6 +7,17 @@ import { errorMessage } from "../errors.ts";
 import { RejectedJob, scheduleJob } from "../queue.ts";
 import { type JobResult, userPayload, uuid } from "./types.ts";
 
+/** A connection may ask for a slower poll, never for a faster one than this. */
+export const MIN_POLL_INTERVAL_MINUTES = 1;
+const MAX_POLL_INTERVAL_MINUTES = 24 * 60;
+
+/** `config.pollIntervalMinutes` is not trusted: anything odd falls back, anything extreme is clamped. */
+export function pollMinutes(configured: unknown, fallback: number): number {
+  const wanted = Number(configured);
+  const minutes = Number.isFinite(wanted) && wanted > 0 ? wanted : fallback;
+  return Math.min(Math.max(minutes, MIN_POLL_INTERVAL_MINUTES), MAX_POLL_INTERVAL_MINUTES);
+}
+
 /** Polls one connection, stores the cursor, turns what it found into events, and books the next poll. */
 export async function pollConnection(deps: Deps, job: JobRow): Promise<JobResult> {
   const connectionId = uuid((job.payload as { connection_id?: unknown }).connection_id);
@@ -15,7 +26,7 @@ export async function pollConnection(deps: Deps, job: JobRow): Promise<JobResult
   // Not pollable (any more): the job ends; the ensure pass books it again when the connection is back.
   if (!connection || connection.status !== "active" || !connector?.poll) return;
 
-  const minutes = Number(connection.config.pollIntervalMinutes) || deps.config.pollIntervalMinutes;
+  const minutes = pollMinutes(connection.config.pollIntervalMinutes, deps.config.pollIntervalMinutes);
   const rescheduleAt = new Date(deps.now().getTime() + minutes * 60_000);
   try {
     const cursor = connection.config.cursor as Record<string, unknown> | undefined;
@@ -44,8 +55,8 @@ export async function pollConnection(deps: Deps, job: JobRow): Promise<JobResult
       }
       if (result.cursor !== undefined) {
         await tx.query(
-          "update ia_connect.connections set config = jsonb_set(config, '{cursor}', $2::jsonb), last_error = null where id = $1",
-          [connection.id, json(result.cursor)],
+          "update ia_connect.connections set config = jsonb_set(config, '{cursor}', $2::jsonb), last_error = null where id = $1 and organization_id = $3",
+          [connection.id, json(result.cursor), connection.organization_id],
         );
       }
     });

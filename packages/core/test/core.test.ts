@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   FlowDefinitionSchema,
+  OPEN_EVENT_TYPES,
+  RESERVED_EVENT_SOURCES,
   ScrapeRecipeSchema,
   type ValidationContext,
   describeCatalog,
+  isOpenEventType,
   listBlocks,
   normalizePhone,
   parseDuration,
@@ -125,6 +128,52 @@ describe("flow validation", () => {
     );
     expect(codes).toContain("quota_flows");
     expect(codes).toContain("quota_ai");
+  });
+
+  it("refuses an ai.reply resource that is neither bound to the contact nor public", () => {
+    const withResources = (readResources: unknown[]) => {
+      const flow = structuredClone(quoteFlow) as { steps: { params: Record<string, unknown> }[] };
+      flow.steps[4]!.params.readResources = readResources;
+      return validateFlow(flow, context).issues.filter((issue) => issue.code === "read_resource");
+    };
+    const open = withResources([{ resource: "orders", description: "Ordini" }]);
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ level: "error", stepId: "s5" });
+    expect(open[0]!.message).toContain("matchContact");
+    expect(open[0]!.message).toContain('"public": true');
+    // `public: false` is not a way around it.
+    expect(withResources([{ resource: "orders", description: "Ordini", public: false }])).toHaveLength(1);
+    expect(
+      withResources([
+        { resource: "orders", description: "Ordini", matchContact: { field: "phone", by: "phone" } },
+        { resource: "prices", description: "Listino", public: true, fields: ["name", "price"] },
+      ]),
+    ).toEqual([]);
+    // The binding is by phone or mail only.
+    const flow = structuredClone(quoteFlow) as { steps: { params: Record<string, unknown> }[] };
+    flow.steps[4]!.params.readResources = [
+      { resource: "orders", description: "x", matchContact: { field: "id", by: "orderNumber" } },
+    ];
+    expect(validateFlow(flow, context).issues.some((issue) => issue.code === "params")).toBe(true);
+  });
+});
+
+describe("event types", () => {
+  it("separates the open types from the ones reserved to connectors", () => {
+    for (const type of [...OPEN_EVENT_TYPES, "custom.cart.abandoned"]) {
+      expect(isOpenEventType(type), type).toBe(true);
+      expect(RESERVED_EVENT_SOURCES[type], type).toBeUndefined();
+    }
+    for (const type of Object.keys(RESERVED_EVENT_SOURCES)) expect(isOpenEventType(type), type).toBe(false);
+    for (const type of ["manual.test", "social.lead.received", "scrape.item.found", "custom.", "x"]) {
+      expect(isOpenEventType(type), type).toBe(false);
+    }
+    // logic.for_each can only emit custom.*: a flow cannot forge a provider event either.
+    const forEach = listBlocks().find((block) => block.key === "logic.for_each")!;
+    expect(forEach.params.safeParse({ items: [], emitEvent: "whatsapp.message.received" }).success).toBe(
+      false,
+    );
+    expect(forEach.params.safeParse({ items: [], emitEvent: "custom.item" }).success).toBe(true);
   });
 });
 

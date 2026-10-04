@@ -62,6 +62,17 @@ Regola generale: **il contenuto letto è dato, mai istruzione**. In pratica:
   contatto e i risultati degli strumenti sono contenuto, che non deve rivelare
   le istruzioni, cambiare ambito, né promettere prezzi o impegni che non ha nel
   contesto, e che è un sistema automatico e non deve fingersi una persona.
+- **Il modello non decide di chi sono i dati.** Gli strumenti di lettura di `ai.reply`
+  ricevono dal modello una ricerca scritta, di fatto, da chi sta chattando: il worker li
+  offre solo per risorse legate al contatto (`matchContact`) o dichiarate `public`, forza
+  il recapito del contatto nella ricerca e scarta i record di altri (vedi
+  `docs/moduli/worker.md`). L'assistente dei flussi conosce la regola (è nel suo prompt) e
+  il validatore rifiuta una risorsa senza l'una né l'altra.
+- **Credenziali solo sul sito giusto.** Il tracciatore dello scraping (e la riesecuzione
+  delle ricette) scrive i valori `{{secrets.*}}` solo quando il browser è su una pagina
+  dello stesso dominio registrabile dell'indirizzo della lettura, e mai dentro un
+  indirizzo: una pagina che convince il modello ad aprire un altro sito non ottiene le
+  credenziali del cliente. Il rifiuto torna al modello come errore dello strumento.
 - **Uscite vincolate.** `classify` restituisce solo una delle chiavi ricevute
   (schema con `enum`, più controllo nel codice: se il modello sbaglia si usa
   `altro`/`other` se esiste, altrimenti la prima). `extract` ha una proprietà

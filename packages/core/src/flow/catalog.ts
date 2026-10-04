@@ -374,9 +374,26 @@ const defs: BlockDefinition[] = [
       scope: Text,
       maxTurns: z.number().int().min(1).max(20).default(6),
       idleTimeout: Duration.default("24h"),
-      /** Read-only CRM resources the model may query. */
+      /**
+       * Read-only CRM resources the model may query. The person writing to the assistant is
+       * not trusted: each resource is either bound to the run's contact (`matchContact`: the
+       * server adds the contact's phone or mail to the query and drops every record that
+       * belongs to someone else) or declared `public` (price list, opening hours). A resource
+       * with neither is not readable. `fields` limits what is returned to the model.
+       */
       readResources: z
-        .array(z.object({ connection: ConnectionRef, resource: Text, description: Text }))
+        .array(
+          z.object({
+            connection: ConnectionRef,
+            resource: Text,
+            description: Text,
+            matchContact: z
+              .object({ field: z.string().min(1).max(100), by: z.enum(["phone", "email"]) })
+              .optional(),
+            fields: z.array(z.string().min(1).max(100)).min(1).max(50).optional(),
+            public: z.boolean().optional(),
+          }),
+        )
         .default([]),
       channel: z.enum(CHANNELS).optional(),
     }),

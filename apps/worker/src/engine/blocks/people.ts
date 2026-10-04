@@ -17,8 +17,8 @@ import { type Executor, type StepContext, next } from "../types.ts";
 export const requestApproval: Executor<{ summary: string; timeout: string }> = {
   async run(ctx, params) {
     const existing = await ctx.sql.query<{ id: string }>(
-      "select id from ia_connect.approvals where flow_run_id = $1 and step_id = $2",
-      [ctx.run.id, ctx.step.id],
+      "select id from ia_connect.approvals where flow_run_id = $1 and step_id = $2 and organization_id = $3",
+      [ctx.run.id, ctx.step.id, ctx.org.id],
     );
     if (ctx.signal?.kind === "approval") {
       const outlet = ctx.signal.decision === "approved" ? "onApproved" : "onRejected";
@@ -26,8 +26,8 @@ export const requestApproval: Executor<{ summary: string; timeout: string }> = {
     }
     if (ctx.signal?.kind === "timeout") {
       await ctx.sql.query(
-        "update ia_connect.approvals set status = 'expired' where flow_run_id = $1 and step_id = $2 and status = 'pending'",
-        [ctx.run.id, ctx.step.id],
+        "update ia_connect.approvals set status = 'expired' where flow_run_id = $1 and step_id = $2 and organization_id = $3 and status = 'pending'",
+        [ctx.run.id, ctx.step.id, ctx.org.id],
       );
       return next({ approvalId: existing[0]?.id ?? null, decision: "expired" }, "onTimeout");
     }
@@ -76,19 +76,20 @@ export async function handoffConversation(ctx: StepContext, note?: string): Prom
   const conversation = rows[0];
   if (conversation) {
     await sql.query(
-      "update ia_connect.conversations set assignee_type = 'user', status = 'open' where id = $1",
-      [conversation.id],
+      "update ia_connect.conversations set assignee_type = 'user', status = 'open' where id = $1 and organization_id = $2",
+      [conversation.id, ctx.org.id],
     );
     const cancelled = await sql.query<{ id: string }>(
       `update ia_connect.flow_runs set status = 'cancelled', finished_at = $3::timestamptz, waiting_for = null,
          error = 'Conversazione passata a un operatore.'
-       where conversation_id = $1 and id <> $2 and status = 'waiting' and waiting_for = 'reply' returning id`,
-      [conversation.id, ctx.run.id, ctx.now.toISOString()],
+       where conversation_id = $1 and organization_id = $4 and id <> $2
+         and status = 'waiting' and waiting_for = 'reply' returning id`,
+      [conversation.id, ctx.run.id, ctx.now.toISOString(), ctx.org.id],
     );
     for (const run of cancelled) {
       await sql.query(
-        "update ia_connect.scheduled_jobs set status = 'cancelled' where flow_run_id = $1 and status = 'pending'",
-        [run.id],
+        "update ia_connect.scheduled_jobs set status = 'cancelled' where flow_run_id = $1 and organization_id = $2 and status = 'pending'",
+        [run.id, ctx.org.id],
       );
     }
     await audit(

@@ -30,7 +30,12 @@ import {
 } from "../../web/src/lib/connections/catalog";
 import { buildValidationContext } from "../../web/src/lib/flows/context";
 import { planTemplateInstall } from "../../web/src/lib/flows/install";
-import { buildTestEvent, sampleEventPayload, testEventProblem } from "../../web/src/lib/flows/test-event";
+import {
+  buildTestEvent,
+  sampleEventPayload,
+  testEventMode,
+  testEventProblem,
+} from "../../web/src/lib/flows/test-event";
 import {
   buildFreeMessage,
   buildTemplateMessage,
@@ -45,6 +50,7 @@ import {
   scrapeTraceJob,
   sendMessageJob,
   simulateFlowJob,
+  simulateSampleJob,
   verifyConnectionJob,
 } from "../../web/src/lib/job-requests";
 import { normalizeTemplateLanguage } from "../../web/src/lib/message-templates";
@@ -449,11 +455,15 @@ describe("approvals decided in the web app", () => {
 describe("flows", () => {
   it("a test event built by the web starts a flow limited to one connection", async () => {
     await setup();
-    const mail = h.connections.mail!;
+    const crm = h.connections.crm!;
     const definition = {
-      trigger: { event: "mail.received", connection: mail, filters: [] },
+      trigger: { event: "order.created", connection: crm, filters: [] },
       steps: [
-        { id: "note", block: "human.notify_owner", params: { message: "Mail da {{event.payload.from}}" } },
+        {
+          id: "note",
+          block: "human.notify_owner",
+          params: { message: "Ordine {{event.payload.orderNumber}}" },
+        },
       ],
     };
     // The flow as the web leaves it after "Attiva": status, active_version_id, trigger_event.
@@ -463,17 +473,18 @@ describe("flows", () => {
       "update ia_connect.flows set status = 'active', active_version_id = $2, trigger_event = $3 where id = $1",
       [flowId, versionId, definition.trigger.event],
     );
-    const payload = sampleEventPayload("mail.received");
-    expect(testEventProblem("mail.received", payload)).toBeNull();
+    const payload = sampleEventPayload("order.created");
+    expect(testEventMode("order.created")).toBe("event");
+    expect(testEventProblem("order.created", payload)).toBeNull();
     const row = buildTestEvent({
       organizationId: h.orgId,
-      type: "mail.received",
+      type: "order.created",
       payload,
       trigger: definition.trigger,
       connectionIds: Object.values(h.connections),
       id: "prova-1",
     });
-    expect(row).toMatchObject({ dedupe_key: "manual:prova-1", connection_id: mail });
+    expect(row).toMatchObject({ dedupe_key: "manual:prova-1", connection_id: crm });
     const eventId = await webInsert("events", row);
     await work();
 
@@ -486,21 +497,54 @@ describe("flows", () => {
       mode: "live",
       event_id: eventId,
     });
-    // An inbound test message is a real one for the worker: contact, consent, conversation, message.
-    const contact = await h.one("select full_name, emails, consents from ia_connect.contacts");
-    expect(contact).toMatchObject({ full_name: "Maria Rossi", emails: ["maria.rossi@example.com"] });
-    expect(contact.consents.mail.granted).toBe(true);
-    expect((await h.one("select direction, delivery_status from ia_connect.messages")).direction).toBe("in");
 
     // "Metti in pausa" as the web writes it: the same event type starts nothing.
     await h.db.asUser(owner, "update ia_connect.flows set status = 'paused' where id = $1", [flowId]);
-    await webInsert("events", {
-      ...row,
-      dedupe_key: "manual:prova-2",
-      payload: { ...payload, from: "altro@example.com" },
-    });
+    await webInsert("events", { ...row, dedupe_key: "manual:prova-2" });
     await work();
     expect(await h.all("select 1 from ia_connect.flow_runs")).toHaveLength(1);
+  });
+
+  it("the test of an inbound-message flow is a simulation: no contact, no window, nothing sent", async () => {
+    await setup();
+    const definition = {
+      trigger: { event: "whatsapp.message.received", filters: [] },
+      steps: [
+        { id: "answer", block: "whatsapp.send_text", params: { text: "Grazie {{event.payload.fromName}}" } },
+      ],
+    };
+    const { versionId } = await h.addFlow(definition);
+    const payload = sampleEventPayload("whatsapp.message.received");
+    expect(testEventMode("whatsapp.message.received")).toBe("simulation");
+    for (const type of ["mail.received", "sms.received", "social.message.received", "payment.completed"]) {
+      expect(testEventMode(type), type).toBe("simulation");
+    }
+    for (const type of ["manual.test", "quote.requested", "custom.richiesta"]) {
+      expect(testEventMode(type), type).toBe("event");
+    }
+    // The database refuses the real event the page used to insert…
+    await expect(
+      webInsert(
+        "events",
+        buildTestEvent({ organizationId: h.orgId, type: "whatsapp.message.received", payload, id: "finto" }),
+      ),
+    ).rejects.toThrow(/row-level security/);
+    // …and the page asks for a simulation over the same content instead.
+    const jobId = await webRequestJob(simulateSampleJob(versionId, payload));
+    await work();
+
+    expect(await job(jobId)).toMatchObject({ status: "done", last_error: null });
+    const run = await h.one("select mode, status, event_id, context from ia_connect.flow_runs");
+    expect(run).toMatchObject({ mode: "simulation", status: "completed", event_id: null });
+    expect(run.context.event.payload.from).toBe(payload.from);
+    const step = await h.one("select status, output from ia_connect.flow_run_steps");
+    expect(step.status).toBe("simulated");
+    // Nobody was created, no conversation was opened, no message left the platform.
+    expect(await h.all("select 1 from ia_connect.contacts")).toHaveLength(0);
+    expect(await h.all("select 1 from ia_connect.conversations")).toHaveLength(0);
+    expect(await h.all("select 1 from ia_connect.messages")).toHaveLength(0);
+    expect(await h.all("select 1 from ia_connect.events")).toHaveLength(0);
+    expect(h.calls).toEqual([]);
   });
 
   it("says before inserting why the worker would ignore a test event", async () => {
@@ -513,10 +557,8 @@ describe("flows", () => {
       trigger: { event: "mail.received", filters: [] },
       steps: [{ id: "note", block: "human.notify_owner", params: { message: "x" } }],
     });
-    const eventId = await webInsert(
-      "events",
-      buildTestEvent({ organizationId: h.orgId, type: "mail.received", payload: old, id: "senza-mittente" }),
-    );
+    // As the mail connector would store it.
+    const eventId = await h.addEvent("mail.received", old);
     await work();
     // This is the worker behaviour the check above protects from.
     expect((await h.one("select status from ia_connect.events where id = $1", [eventId])).status).toBe(
@@ -932,11 +974,13 @@ describe("connections", () => {
     );
     const merged = mergeReconnectConfig(stored, fresh, { sameAccount: true });
     expect(merged).toEqual({ email: "info@agenzia.it", cursor: { lastUid: 1 } });
-    await h.db.asUser(
+    // Written by the web server with the service role, on behalf of the signed-in manager.
+    await h.sql.query("select ia_connect.save_connection($1, $2, $3, $4::jsonb)", [
       owner,
-      "update ia_connect.connections set config = $2::jsonb, status = 'active', last_error = null where id = $1",
-      [id, JSON.stringify(merged)],
-    );
+      h.orgId,
+      id,
+      JSON.stringify({ config: merged, status: "active", last_error: null }),
+    ]);
     h.advance(10 * 60_000);
     await h.sql.query(
       "update ia_connect.scheduled_jobs set run_at = now() - interval '1 minute' where kind = 'poll_connection'",

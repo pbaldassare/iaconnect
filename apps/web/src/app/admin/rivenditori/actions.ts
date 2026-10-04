@@ -103,7 +103,7 @@ export async function addResellerAdmin(
   }
   if (!userId) {
     return fail(
-      "Nessun utente registrato con questa mail. Qui si possono aggiungere solo persone che hanno già un account: falla prima accedere (o creala da Supabase → Authentication), poi riprova.",
+      "Nessun utente con questa mail confermata. Qui si possono aggiungere solo persone che hanno già un account e hanno confermato l'indirizzo: falla prima accedere dal link ricevuto per mail (o creala da Supabase → Authentication), poi riprova.",
       { email: "Utente non trovato." },
     );
   }

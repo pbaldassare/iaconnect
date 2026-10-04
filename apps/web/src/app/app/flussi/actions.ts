@@ -7,10 +7,10 @@ import { insertFlowVersion, loadFlowEnvironment, loadFlowPermissions } from "@/l
 import {
   INBOUND_TEST_EVENT_NOTE,
   buildTestEvent,
-  isInboundMessageEvent,
+  testEventMode,
   testEventProblem,
 } from "@/lib/flows/test-event";
-import { simulateFlowJob } from "@/lib/job-requests";
+import { simulateFlowJob, simulateSampleJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { type OrgContext, actorOf, requireOrgManager } from "@/lib/session";
@@ -321,7 +321,11 @@ export async function saveManualVersion(
   redirect(`${BASE}/${flow.id}?scheda=controlli&versione=${created.data.id}&esito=salvata`);
 }
 
-/** Inserts a test event (`manual.test` or the flow's trigger type). Active flows with that trigger will run for real. */
+/**
+ * Test event: `manual.test` or the flow's trigger type. The open types are inserted as real
+ * events (active flows with that trigger run for real); the types reserved to connectors
+ * run the flow in simulation over the given content (see lib/flows/test-event.ts).
+ */
 export async function sendTestEvent(
   flowId: string,
   _prev: ActionResult,
@@ -358,6 +362,26 @@ export async function sendTestEvent(
   // A trigger limited to one connection only matches events of that connection.
   const version = await loadVersion(context, flow.id, flow.active_version_id);
   const definition = FlowDefinitionSchema.safeParse(version?.definition);
+  if (testEventMode(type) === "simulation") {
+    // Reserved to connectors: a made-up inbound message or payment would be taken as true.
+    // The flow runs in simulation over this content instead; nothing is stored or sent.
+    if (!version || !definition.success) {
+      return fail("Salva prima una versione valida del flusso: la prova la esegue in simulazione.");
+    }
+    const { error } = await requestJob(context.supabase, {
+      organizationId: orgId,
+      ...simulateSampleJob(version.id, payload as Record<string, unknown>),
+      actor: actorOf(context),
+    });
+    if (error) {
+      if ((error as { code?: string }).code === "23505") return ok("La prova è già stata richiesta.");
+      return failFromError(error);
+    }
+    refresh(flow.id);
+    return ok(
+      `Prova avviata in simulazione: il risultato compare nella scheda «Simulazione» tra qualche secondo. ${INBOUND_TEST_EVENT_NOTE}`,
+    );
+  }
   const { data: connections } = await context.supabase
     .from("connections")
     .select("id")
@@ -388,11 +412,9 @@ export async function sendTestEvent(
     isSupportAccess: actor.type === "admin",
   });
   refresh(flow.id);
-  const note = isInboundMessageEvent(type) ? ` ${INBOUND_TEST_EVENT_NOTE}` : "";
   return ok(
-    (flow.status === "active"
+    flow.status === "active"
       ? "Evento di prova inserito. Se corrisponde al trigger, l'esecuzione compare qui tra poco: è un'esecuzione vera, i messaggi partono davvero."
-      : "Evento di prova inserito. Il flusso non è attivo, quindi non partirà: puoi usarlo per la simulazione.") +
-      note,
+      : "Evento di prova inserito. Il flusso non è attivo, quindi non partirà: puoi usarlo per la simulazione.",
   );
 }

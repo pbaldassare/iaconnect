@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { errorMessage } from "@/lib/action";
 import { loadConnectorCatalog } from "@/lib/connections/access";
 import { connectModeLabel } from "@/lib/connections/catalog";
+import { OAUTH_STATE_SECRET_MISSING } from "@/lib/connections/oauth-state";
 import { formatRelative } from "@/lib/format";
 import { connectionStatus, connectorCategoryLabel } from "@/lib/labels";
 import { firstParam } from "@/lib/pagination";
@@ -35,6 +36,11 @@ const OUTCOMES: Record<string, { tone: "ok" | "error" | "warning"; text: string 
   chiave: {
     tone: "error",
     text: "Per creare collegamenti il server ha bisogno della chiave di servizio Supabase (SUPABASE_SERVICE_ROLE_KEY), che non è configurata.",
+  },
+  segreto: { tone: "error", text: OAUTH_STATE_SECRET_MISSING },
+  gia_collegato: {
+    tone: "error",
+    text: "Questo account è già collegato, in questa o in un'altra azienda. Se è tra i collegamenti qui sotto usa «Ricollega»; altrimenti va scollegato dall'altra azienda prima di poterlo collegare qui.",
   },
   errore: { tone: "error", text: "Il collegamento non è riuscito. Riprova tra qualche minuto." },
 };

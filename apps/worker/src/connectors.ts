@@ -35,6 +35,7 @@ export async function connectorContext(deps: Deps, connection: ConnectionRow): P
     },
     saveSecrets: (next) => deps.secrets.write(connection.id, next),
     env: deps.config.env,
+    resolveHost: deps.resolveHost,
   };
 }
 

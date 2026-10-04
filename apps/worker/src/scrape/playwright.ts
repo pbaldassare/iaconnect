@@ -1,17 +1,28 @@
-import type { ExtractStep } from "@ia-connect/core";
-import { type Browser, type LaunchOptions, type Page, chromium } from "playwright";
+import { type ExtractStep, type HostResolver, isPublicHostname } from "@ia-connect/core";
+import { type Browser, type BrowserContext, type LaunchOptions, type Page, chromium } from "playwright";
 import type { ClosableBrowser } from "../deps.ts";
+import { type EgressPolicy, publicOnly, startEgressProxy } from "./egress.ts";
 
 export interface PlaywrightOptions {
   launch?: LaunchOptions;
   timeoutMs?: number;
   /** Recipes come from customers and from the AI: private addresses are refused unless a test allows them. */
   allowPrivateHosts?: boolean;
+  /** DNS lookup behind the default egress policy (default: the system resolver). */
+  resolveHost?: HostResolver;
+  /**
+   * Which hosts the browser may connect to, and at which address (see `egress.ts`).
+   * Default: every address the host resolves to must be public. Tests replace it to map
+   * made-up names onto local servers.
+   */
+  egress?: EgressPolicy;
 }
 
-const PRIVATE_HOST =
-  /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.|0\.|\[?::1\]?$|\[?f[cd])/i;
-
+/**
+ * String-level check of an address the recipe navigates to, for a clear error before any
+ * request. The real boundary is the egress proxy, which vets every connection the browser
+ * makes (redirects and subresources included) after resolving the name.
+ */
 export function assertPublicUrl(raw: string, allowPrivate = false): void {
   let url: URL;
   try {
@@ -23,9 +34,30 @@ export function assertPublicUrl(raw: string, allowPrivate = false): void {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new Error(`Indirizzo non ammesso: ${url.protocol}`);
   }
-  if (!allowPrivate && PRIVATE_HOST.test(url.hostname)) {
+  if (!allowPrivate && (!isPublicHostname(url.hostname) || url.username || url.password)) {
     throw new Error("Indirizzo non ammesso: rete interna.");
   }
+}
+
+/**
+ * First layer inside the browser: every request Playwright shows us (navigations and
+ * subresources; not the hops of a redirect, which only the proxy sees) must be http(s)
+ * towards a host the policy accepts. Anything else is aborted before it leaves.
+ */
+export async function guardRequests(context: BrowserContext, policy: EgressPolicy): Promise<void> {
+  await context.route("**/*", async (route) => {
+    let allowed = false;
+    try {
+      const url = new URL(route.request().url());
+      if (url.protocol === "http:" || url.protocol === "https:") {
+        await policy(url.hostname.replace(/^\[|\]$/g, ""));
+        allowed = true;
+      }
+    } catch {
+      allowed = false;
+    }
+    await (allowed ? route.continue() : route.abort("blockedbyclient")).catch(() => undefined);
+  });
 }
 
 /** Runs in the page: reads one row per `listSelector` match, honoring `attr` and `transform`. */
@@ -164,15 +196,72 @@ export function pagePort(page: Page, options: PlaywrightOptions = {}): Omit<Clos
   };
 }
 
-/** One fresh, isolated browser per scrape run. */
+/**
+ * One fresh, isolated browser per scrape run. Unless a test allows private hosts, all its
+ * traffic goes through the egress proxy and nothing bypasses it (no direct connections, no
+ * service workers, no extra pages).
+ */
 export async function openPlaywrightBrowser(options: PlaywrightOptions = {}): Promise<ClosableBrowser> {
-  const browser: Browser = await chromium.launch({ headless: true, ...options.launch });
+  const base = options.allowPrivateHosts ? undefined : (options.egress ?? publicOnly(options.resolveHost));
+  // Counts the refusals of both layers, to tell the customer why a navigation failed.
+  let refusals = 0;
+  const policy: EgressPolicy | undefined = base
+    ? async (hostname) => {
+        try {
+          return await base(hostname);
+        } catch (error) {
+          refusals += 1;
+          throw error;
+        }
+      }
+    : undefined;
+  const proxy = policy ? await startEgressProxy(policy) : undefined;
+  let browser: Browser | undefined;
+  const close = async () => {
+    await browser?.close().catch(() => undefined);
+    await proxy?.close();
+  };
   try {
-    const context = await browser.newContext({ locale: "it-IT" });
+    browser = await chromium.launch({
+      headless: true,
+      ...options.launch,
+      ...(proxy
+        ? {
+            // `<-loopback>`: Chromium would otherwise connect to localhost and to link-local
+            // addresses (the cloud metadata service) directly, without asking the proxy.
+            proxy: { server: proxy.url, bypass: "<-loopback>" },
+            args: [
+              ...(options.launch?.args ?? []),
+              // WebRTC would open UDP sockets that no proxy sees.
+              "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+              "--disable-quic",
+            ],
+          }
+        : {}),
+    });
+    const context = await browser.newContext({
+      locale: "it-IT",
+      ...(policy ? { serviceWorkers: "block" as const } : {}),
+    });
+    if (policy) await guardRequests(context, policy);
     const page = await context.newPage();
-    return { ...pagePort(page, options), close: () => browser.close() };
+    const port = pagePort(page, options);
+    return {
+      ...port,
+      async goto(url) {
+        const refusedBefore = refusals;
+        try {
+          await port.goto(url);
+        } catch (error) {
+          // A host was refused on the way: the address itself, or a redirect.
+          if (refusals > refusedBefore) throw new Error("Indirizzo non ammesso: rete interna.");
+          throw error;
+        }
+      },
+      close,
+    };
   } catch (error) {
-    await browser.close();
+    await close();
     throw error;
   }
 }

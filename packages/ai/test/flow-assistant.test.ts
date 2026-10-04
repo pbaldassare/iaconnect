@@ -86,6 +86,9 @@ describe("proposeFlow", () => {
     expect(system[0]!.text).toContain("whatsapp.send_template");
     expect(system[0]!.text).toContain("social.lead.received");
     expect(system[0]!.text).toContain("onHandoff");
+    // The rule that keeps one contact from reading another contact's records.
+    expect(system[0]!.text).toContain("matchContact");
+    expect(system[0]!.text).toContain("public: true");
     expect(system[0]!.text).not.toContain(WHATSAPP);
     expect(system[1]!.cache_control).toBeUndefined();
     expect(system[1]!.text).toContain(WHATSAPP);

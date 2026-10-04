@@ -27,7 +27,7 @@ precedente (una pagina spostata o cancellata): `rm -rf apps/web/.next` e rilanci
 | Variabile | Serve per |
 | --- | --- |
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | client con la sessione dell'utente (obbligatorie) |
-| `APP_URL` | indirizzo pubblico dell'app, usato nei link delle mail (accesso, inviti) |
+| `APP_URL` | indirizzo pubblico dell'app, usato nei link delle mail (accesso, inviti) e come ritorno OAuth. **Obbligatoria in produzione**: lì l'indirizzo non viene mai ricavato dalla richiesta (`Host`, `X-Forwarded-Host`), e senza `APP_URL` l'operazione fallisce con un messaggio che lo dice (`lib/app-url.ts`) |
 | `SUPABASE_SERVICE_ROLE_KEY` | solo server: mail di invito, indirizzi degli utenti, ricerca utente per mail, marchio del rivenditore per i clienti |
 
 Senza `SUPABASE_SERVICE_ROLE_KEY` l'app funziona lo stesso; le funzioni che la richiedono
@@ -273,7 +273,16 @@ org_features, connections, flows, flow_versions, message_templates, deal_stages,
 contacts, scrape_recipes, approvals, support_sessions, messaggi in uscita scritti da una
 persona). Per quelle **non** si chiama `writeAudit`. Lo si chiama per ciò che i trigger non
 vedono (un'esportazione, una mail inviata), con un nome `<area>.<verbo>` e la descrizione
-italiana aggiunta in `lib/audit-labels.ts`.
+italiana aggiunta in `lib/audit-labels.ts`. `writeAudit` non inserisce la riga: chiama la
+funzione `ia_connect.log_action`, che decide da sola chi è l'attore (utente della sessione,
+`admin` se è personale di piattaforma o del rivenditore, accesso di assistenza, ora). Nessun
+utente può inserire direttamente in `audit_log`, e un nome d'azione che finisce in
+`.insert`, `.update`, `.delete` (quelli dei trigger) viene rifiutato.
+
+Le scritture fatte dal server con la chiave di servizio **per conto di un utente** (oggi:
+i collegamenti) passano da funzioni del database che ricevono l'id dell'utente e lo
+impostano per la transazione (`ia_connect.actor_id`): il trigger del registro scrive
+quell'utente, non «automazione».
 
 **Chiedere un lavoro al motore.** Il web non chiama connettori, IA o scraping: inserisce
 una riga in `scheduled_jobs` e mostra l'esito quando il motore aggiorna i dati.
@@ -314,6 +323,7 @@ che dice cosa fare.
 
 | Funzione | Senza `SUPABASE_SERVICE_ROLE_KEY` |
 | --- | --- |
+| Collegamenti: crea, ricollega, scollega, «Controlla stato», scollega dall'area admin | rifiutati con il messaggio che dice quale variabile impostare (le scritture su `connections` passano solo dal server) |
 | Invito (creazione azienda, scheda → Utenti) | la riga in `invitations` viene creata; la mail non parte e la pagina spiega come far entrare la persona |
 | Utenti dell'azienda e amministratori del rivenditore | compaiono con l'identificativo abbreviato al posto della mail |
 | Aggiungere un amministratore al rivenditore | rifiutato con un messaggio che dice quale variabile impostare |
@@ -512,16 +522,31 @@ Il web chiama `connector.connect` sul server (è l'unica eccezione alla regola �
 chiama i connettori»: serve una risposta immediata e i segreti non devono passare da
 `scheduled_jobs`). Ordine, in `lib/connections/server.ts` → `saveConnection`:
 
-1. `connect(input, { fetch, env })`; l'`env` passato è solo l'elenco di variabili che i
-   connettori dichiarano di leggere (`connectorEnv`).
-2. riga in `connections` con il client di sessione (RLS e registro vedono l'utente vero);
-   `config` passa da `sanitizeConfig`, che scarta chiavi dal nome di credenziale e valori
-   uguali a un segreto;
-3. `store_connection_secret` con il client di servizio; se fallisce la riga viene tolta;
+1. `connect(input, { fetch, env, resolveHost })` (`connectDeps`); l'`env` passato è solo
+   l'elenco di variabili che i connettori dichiarano di leggere (`connectorEnv`),
+   `resolveHost` è la risoluzione DNS con cui i connettori controllano gli indirizzi
+   scritti dal cliente;
+2. riga in `connections` tramite `writeConnection` → funzione `ia_connect.save_connection`,
+   con il client di servizio **per conto dell'utente**: la funzione ricontrolla che l'utente
+   sia gestore dell'azienda, che il tipo di collegamento sia attivo e previsto dal piano, e
+   il registro riporta l'utente vero. `config` passa da `sanitizeConfig`, che scarta chiavi
+   dal nome di credenziale e valori uguali a un segreto;
+3. `store_connection_secret` con il client di servizio; se fallisce la riga viene tolta
+   (`remove_connection`);
 4. se il connettore ha l'azione `registerWebhook` (Stripe, waWebApi) viene chiamata con
    l'indirizzo del collegamento; se fallisce il collegamento resta e la scheda offre
    «Registra di nuovo il webhook». Per Twilio l'indirizzo viene scritto in
    `config.statusCallbackUrl`.
+
+**I clienti non scrivono `connections`.** `external_account_id`, `config` e
+`webhook_token` decidono a quale azienda arriva un webhook: con il client di sessione si
+può solo leggere e rinominare (`update (name)`). Creazione, ricollegamento, scollegamento,
+esito di «Controlla stato» e lo scollegamento dall'area admin passano tutti da
+`writeConnection`. Un account del fornitore può avere **un solo collegamento non
+scollegato** in tutta la piattaforma (indice unico su `connector_type, external_account_id`;
+esclusi `scraper_site`, `sms_twilio`, `google_calendar`, dove lo stesso account serve
+legittimamente più collegamenti): il secondo tentativo riceve «Questo account è già
+collegato a un'altra azienda» (o «…in questa azienda: usa Ricollega»).
 
 Per modalità:
 
@@ -556,7 +581,9 @@ Per modalità:
    un'altra pagina ripete l'autorizzazione con `pagina=<id>` (il token delle altre pagine
    non viene conservato).
 
-Chiave della firma: `OAUTH_STATE_SECRET`, altrimenti `SUPABASE_SERVICE_ROLE_KEY`.
+Chiave della firma: `OAUTH_STATE_SECRET` (almeno 32 caratteri), **senza ripiego** sulla
+chiave di servizio: se manca, l'avvio torna a `/app/collegamenti?esito=segreto` con il
+messaggio che dice quale variabile impostare.
 `APP_URL` deve essere l'indirizzo pubblico: l'indirizzo di ritorno registrato presso
 Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
 
@@ -582,14 +609,18 @@ Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
   successo, con i dettagli del blocco (destinatario e testo, contatto e trattativa che
   verrebbero creati, dati per il gestionale…) e gli avvisi sui rifiuti; il JSON completo
   resta sotto.
-- **Evento di prova**: riga in `events` (`manual.test` o il tipo del trigger) con
-  `dedupe_key = manual:<uuid>` e voce di registro `flow.test_event` (`lib/flows/test-event.ts`).
-  Se il trigger è limitato a un collegamento l'evento porta quel `connection_id`, altrimenti
-  non corrisponderebbe mai. Per i messaggi in arrivo (mail, WhatsApp, SMS, social) il
-  contenuto deve avere `from`: senza mittente il motore ignora l'evento, quindi l'azione lo
-  rifiuta prima; il contenuto proposto è un esempio adatto al tipo. Un messaggio in arrivo
-  di prova crea davvero contatto, conversazione e messaggio. Su un flusso attivo
-  l'esecuzione è vera: la pagina lo dice.
+- **Evento di prova** (`lib/flows/test-event.ts`, `testEventMode`): due strade.
+  - Tipi aperti (`manual.test`, `custom.*`, `quote.requested`, `order.created`,
+    `listing.published`, `crm.record.created/updated`): riga in `events` con
+    `dedupe_key = manual:<uuid>` e voce di registro `flow.test_event`. Se il trigger è
+    limitato a un collegamento l'evento porta quel `connection_id`. Su un flusso attivo
+    l'esecuzione è vera: la pagina lo dice.
+  - Tipi riservati ai connettori (messaggi in arrivo, stati di consegna, pagamenti, firme,
+    contatti e commenti social, scraping…): il database **rifiuta** l'inserimento. La prova
+    chiede una simulazione sul contenuto indicato (`simulateSampleJob`, lavoro
+    `simulate_flow` con `sample`): il flusso gira in simulazione, non nasce alcun contatto,
+    non si apre la finestra WhatsApp, non parte alcun messaggio. Per i messaggi in arrivo
+    il contenuto deve comunque avere `from`.
 - Funzioni: `flow_editor` spento → il cliente vede soltanto; `flow_assistant` spento →
   niente assistente; `scraping` spento → niente nuove letture. L'assistenza non è
   bloccata da questi interruttori. `social`, `scraping`, `payments_signature` spenti
@@ -601,7 +632,7 @@ Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
 | --- | --- |
 | `SUPABASE_SERVICE_ROLE_KEY` | ogni nuovo collegamento (segreti nel Vault), scollegamento presso il fornitore, registro delle chiamate IA dell'assistente. Senza, le pagine lo dicono e rifiutano l'operazione |
 | `ANTHROPIC_API_KEY` (`AI_MODEL_SMART` facoltativa) | assistente dei flussi |
-| `OAUTH_STATE_SECRET` | firma dello stato OAuth (facoltativa: ripiego sulla chiave di servizio) |
+| `OAUTH_STATE_SECRET` | firma dello stato OAuth. Obbligatoria per i collegamenti OAuth: stringa casuale di almeno 32 caratteri (`openssl rand -hex 32`) |
 | `GOOGLE_CLIENT_ID/SECRET`, `MICROSOFT_CLIENT_ID/SECRET`, `META_APP_ID/SECRET`, `META_GRAPH_VERSION` | OAuth di Gmail, Google Calendar, Microsoft 365, Facebook e Instagram |
 | `WAWEBAPI_BASE_URL` | WhatsApp via QR |
 | `WEBHOOK_PUBLIC_URL` | indirizzo di base dei webhook mostrato al cliente (predefinito: la funzione del progetto Supabase) |
@@ -636,3 +667,48 @@ Limiti noti e ripieghi:
   e motore scrivono la stessa colonna senza blocco: un ricollegamento fatto proprio mentre il
   motore salva un cursore può rimettere quello di un attimo prima (gli eventi non si
   duplicano, hanno una `dedupe_key`).
+
+## Sicurezza (verifica del 2026-10-04)
+
+Il confine di sicurezza è il database, non le azioni del server: un gestore può parlare
+direttamente con PostgREST. La migrazione `20261004001000_security_hardening.sql` e i test
+`supabase/test/hardening.test.ts` fissano ciò che un utente **non** può fare nemmeno così.
+Per chi scrive nuove pagine:
+
+- `connections`: sola lettura e rinomina dal client di sessione (vedi «Collegamento guidato»).
+- Riferimenti tra tabelle del cliente: chiavi esterne composte con `organization_id`. Una
+  riga dell'azienda A non può indicare un contatto, una conversazione, un flusso, una
+  esecuzione o un collegamento dell'azienda B. Ogni nuova tabella con un riferimento a
+  un'altra tabella del cliente deve fare lo stesso (un test lo controlla su tutto lo schema).
+- `events`: un gestore inserisce solo `manual.test` e i tipi aperti (`isOpenEventType`),
+  al massimo 100 in attesa per azienda. `scheduled_jobs`: `dedupe_key` nulla o che inizia
+  con `user:` (i costruttori di `lib/job-requests.ts` lo fanno già), al massimo 50 in attesa
+  per azienda; oltre, l'errore `IAC01` diventa «Ci sono troppe richieste in attesa…».
+- `flows`: il database rifiuta `status = 'active'` senza una versione del flusso stesso e
+  oltre il limite `active_flows` del piano (`IAC02`). I controlli della pagina restano,
+  per dare messaggi migliori.
+- `messages`: un utente non può cambiare testo, direzione, conversazione o id esterno di
+  un messaggio esistente, né cancellare un singolo messaggio (la cancellazione del contatto
+  continua a togliere tutto).
+- `audit_log`: solo tramite `log_action` (vedi «Registro»).
+- `delete_organization` è riservata al ruolo di servizio; l'area admin chiama
+  `admin_delete_organization`. `quota_left` risponde solo a chi può leggere l'azienda.
+- Inviti e ruoli per mail contano solo per indirizzi **confermati** (`accept_invitations`,
+  `findUserIdByEmail`): l'autenticazione è condivisa con un'altra applicazione in cui
+  chiunque può registrarsi con qualunque indirizzo.
+- Intestazioni (`next.config.ts`): `Strict-Transport-Security` e una
+  `Content-Security-Policy` **senza nonce**: `default-src 'self'`, script e stili con
+  `'unsafe-inline'` (li richiede l'idratazione dell'App Router; un nonce obbligherebbe a
+  generare ogni pagina a ogni richiesta), `img-src 'self' data: https:`, `connect-src`
+  verso l'app e Supabase, `frame-ancestors 'none'`, `object-src 'none'`, `base-uri` e
+  `form-action` solo verso l'app. `'unsafe-eval'` solo in sviluppo.
+
+Punti aperti:
+
+- **Assistenza**: il personale di piattaforma e del rivenditore legge i dati di un'azienda
+  anche senza una sessione di assistenza aperta (`support_sessions` registra, non autorizza).
+  Rendere le letture condizionate a una sessione aperta è una modifica delle policy di tutte
+  le tabelle: non fatta. Fatto: una sessione non può più essere riassegnata né retrodatata.
+- **CSP senza nonce**: `'unsafe-inline'` sugli script lascia a un eventuale XSS la
+  possibilità di eseguire codice; chiude comunque script esterni, frame e invii di moduli
+  verso altri siti.

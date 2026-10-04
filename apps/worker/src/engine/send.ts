@@ -60,9 +60,10 @@ async function withDisclosure(ctx: StepContext, conversation: ConversationRow | 
   if (!disclosure || /automatic/i.test(text) || text.includes(disclosure)) return text;
   if (conversation) {
     const sent = await ctx.sql.query(
-      `select 1 from ia_connect.messages where conversation_id = $1 and direction = 'out' and sent_by_user_id is null
+      `select 1 from ia_connect.messages
+       where conversation_id = $1 and organization_id = $2 and direction = 'out' and sent_by_user_id is null
        limit 1`,
-      [conversation.id],
+      [conversation.id, ctx.org.id],
     );
     if (sent.length) return text;
   }

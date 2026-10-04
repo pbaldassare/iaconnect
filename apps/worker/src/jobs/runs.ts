@@ -47,7 +47,8 @@ export async function approvalDecided(deps: Deps, job: JobRow): Promise<JobResul
     current: string | null;
   }>(
     `select a.flow_run_id, a.step_id, a.status, r.current_step_id as current
-     from ia_connect.approvals a join ia_connect.flow_runs r on r.id = a.flow_run_id
+     from ia_connect.approvals a
+     join ia_connect.flow_runs r on r.id = a.flow_run_id and r.organization_id = a.organization_id
      where a.id = $1 and a.organization_id = $2`,
     [approvalId, job.organization_id],
   );
@@ -64,7 +65,10 @@ export async function approvalDecided(deps: Deps, job: JobRow): Promise<JobResul
 }
 
 /** Read-only lookup of who an event is about, so a simulation can show real names. */
-async function simulationLink(deps: Deps, event: EventRow) {
+async function simulationLink(
+  deps: Deps,
+  event: Pick<EventRow, "organization_id" | "type" | "payload" | "contact_hint">,
+) {
   const channel: Channel | undefined = INBOUND_MESSAGE_EVENTS[event.type];
   const payload = event.payload as Record<string, unknown>;
   const from = typeof payload.from === "string" ? payload.from : "";
@@ -99,13 +103,6 @@ export async function simulateFlow(deps: Deps, job: JobRow): Promise<JobResult> 
   if (!parsed.success) throw new RejectedJob("flow version with an invalid definition");
   const definition = parsed.data;
   const limit = payload.limit ?? 3;
-
-  const recent = await deps.sql.query<EventRow>(
-    `select * from ia_connect.events where organization_id = $1 and type = $2
-     order by created_at desc limit 200`,
-    [organizationId, definition.trigger.event],
-  );
-  const events = recent.filter((event) => triggerMatches(definition, event)).slice(0, limit);
   const base = {
     organizationId,
     flowId: versions[0].flow_id,
@@ -113,25 +110,43 @@ export async function simulateFlow(deps: Deps, job: JobRow): Promise<JobResult> 
     definition,
     mode: "simulation" as const,
   };
-
-  // A new simulation replaces the previous one over the same event.
-  if (events.length === 0) {
+  const withoutEvent = async (sample: Record<string, unknown>) => {
     await deps.sql.query(
-      "delete from ia_connect.flow_runs where flow_version_id = $1 and event_id is null and mode = 'simulation'",
-      [versionId],
+      "delete from ia_connect.flow_runs where flow_version_id = $1 and organization_id = $2 and event_id is null and mode = 'simulation'",
+      [versionId, organizationId],
     );
-    // No real event yet: one run over an empty event still shows the path of the flow.
+    const type = definition.trigger.event;
     const run = await createRun(deps.sql, {
       ...base,
-      event: { id: null, type: definition.trigger.event, payload: {} },
+      event: { id: null, type, payload: sample, connection_id: definition.trigger.connection ?? null },
+      ...(await simulationLink(deps, {
+        organization_id: organizationId,
+        type,
+        payload: sample as EventRow["payload"],
+        contact_hint: null,
+      })),
     });
     await executeRun(deps, run.id);
-    return;
-  }
+  };
+
+  // A test with made-up content (the web's "evento di prova" for a trigger reserved to
+  // connectors): one simulation over it. No event is stored, nothing is sent.
+  if (payload.sample) return withoutEvent(payload.sample.payload);
+
+  const recent = await deps.sql.query<EventRow>(
+    `select * from ia_connect.events where organization_id = $1 and type = $2
+     order by created_at desc limit 200`,
+    [organizationId, definition.trigger.event],
+  );
+  const events = recent.filter((event) => triggerMatches(definition, event)).slice(0, limit);
+
+  // A new simulation replaces the previous one over the same event.
+  // No real event yet: one run over an empty event still shows the path of the flow.
+  if (events.length === 0) return withoutEvent({});
   for (const event of events) {
     await deps.sql.query(
-      "delete from ia_connect.flow_runs where flow_version_id = $1 and event_id = $2 and mode = 'simulation'",
-      [versionId, event.id],
+      "delete from ia_connect.flow_runs where flow_version_id = $1 and organization_id = $3 and event_id = $2 and mode = 'simulation'",
+      [versionId, event.id, organizationId],
     );
     const run = await createRun(deps.sql, { ...base, event, ...(await simulationLink(deps, event)) });
     await executeRun(deps, run.id);

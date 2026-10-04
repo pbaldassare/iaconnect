@@ -142,6 +142,7 @@ async function handleProviderRoute(
   const received = await connector.receiveProviderWebhook(request, deps.env);
   if (!received.verified) return empty(401);
 
+  const logger = deps.logger ?? silentLogger;
   const seen = new Set<string>();
   let failed = false;
   for (const accountId of new Set(received.accountIds)) {
@@ -150,16 +151,32 @@ async function handleProviderRoute(
       if (connection.connectorKey !== connector.key || connection.status !== "active") continue;
       if (seen.has(connection.id)) continue;
       seen.add(connection.id);
+      const scope = { connectorKey: connector.key, connectionId: connection.id };
+      let events: NormalizedEventInput[];
       try {
-        await deliver(connector, connection, request, deps);
+        const secrets = (await deps.readSecrets(connection.id)) ?? {};
+        // A connection the server completed always has its secrets (`connector.connect` proved
+        // the account belongs to the customer). A row without them was never connected that
+        // way: it receives nothing, whatever account id it carries.
+        if (Object.keys(secrets).length === 0) {
+          logger.warn("provider webhook skipped: connection without secrets", scope);
+          continue;
+        }
+        try {
+          const result = await connector.handleWebhook!(contextFor(connection, secrets, deps), request);
+          events = result.verified ? validEvents(result.events) : [];
+        } catch {
+          // This connection's own problem (broken configuration): the others in the batch are
+          // served and the provider is not asked to redeliver because of it.
+          logger.error("webhook handler failed", scope);
+          continue;
+        }
+        if (events.length > 0) await deps.insertEvents(connection, events);
       } catch {
-        // Keep serving the other customers in the batch; the provider redelivers on 500
-        // and the dedupe keys drop what was already stored.
+        // Our own failure (database): the provider redelivers on 500 and the dedupe keys drop
+        // what was already stored.
         failed = true;
-        (deps.logger ?? silentLogger).error("webhook delivery failed", {
-          connectorKey: connector.key,
-          connectionId: connection.id,
-        });
+        logger.error("webhook delivery failed", scope);
       }
     }
   }
@@ -171,7 +188,9 @@ async function handleProviderRoute(
  * Routes (path suffix):
  * - `/c/<webhook_token>`: one connection; its connector verifies the signature.
  * - `/p/<connector_key>`: one URL per provider; the connector verifies the request with
- *   platform secrets, then each matching active connection handles it.
+ *   platform secrets, then each matching active connection that has stored secrets handles it.
+ *   Which connection matches is decided by `findConnectionsByAccount`, on columns only the
+ *   server writes (`external_account_id`, `config.accountAliases`).
  */
 export async function handleInboundWebhook(request: Request, deps: WebhookDeps): Promise<Response> {
   const url = new URL(request.url);

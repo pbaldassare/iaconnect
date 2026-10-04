@@ -3,7 +3,9 @@ import type { Deps } from "./deps.ts";
 
 /** A recurring job is one row per target; this revives it when it ended or failed a while ago. */
 const REVIVE = `on conflict (dedupe_key) do update
-  set status = 'pending', attempts = 0, run_at = excluded.run_at, last_error = null, locked_until = null
+  set status = 'pending', attempts = 0, run_at = excluded.run_at, last_error = null, locked_until = null,
+      organization_id = excluded.organization_id, kind = excluded.kind, payload = excluded.payload,
+      flow_run_id = excluded.flow_run_id, created_by = null
   where ia_connect.scheduled_jobs.status in ('done', 'cancelled')
      or (ia_connect.scheduled_jobs.status = 'failed' and ia_connect.scheduled_jobs.updated_at < $1::timestamptz - interval '1 hour')`;
 

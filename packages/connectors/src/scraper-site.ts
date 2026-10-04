@@ -1,7 +1,7 @@
-import type { Connector } from "@ia-connect/core";
+import type { Connector, HostResolver } from "@ia-connect/core";
 import { z } from "zod";
 import { errorFromStatus, healthFromError, parseInput, requireString, send } from "./lib/http.ts";
-import { assertPublicHttpUrl } from "./lib/url.ts";
+import { assertPublicHttpUrl, guardedFetch } from "./lib/url.ts";
 import { compact } from "./lib/values.ts";
 
 const SERVICE = "Sito";
@@ -13,9 +13,15 @@ export const ScraperSiteInput = z.object({
 });
 
 /** The site must answer; the login itself is exercised by the scraping recipes in the worker. */
-async function checkReachable(fetchFn: typeof fetch, siteUrl: string): Promise<void> {
+async function checkReachable(
+  deps: { fetch: typeof fetch; resolveHost?: HostResolver },
+  siteUrl: string,
+): Promise<void> {
   const url = assertPublicHttpUrl(siteUrl, SERVICE);
-  const response = await send(fetchFn, SERVICE, url.toString(), { headers: { accept: "text/html,*/*" } });
+  // Redirects are followed one checked hop at a time: a public address may point inwards.
+  const response = await send(guardedFetch(deps.fetch, SERVICE, deps.resolveHost), SERVICE, url.toString(), {
+    headers: { accept: "text/html,*/*" },
+  });
   await response.body?.cancel().catch(() => undefined);
   // 401/403 on the home page are normal for portals behind a login.
   if (response.status >= 400 && response.status !== 401 && response.status !== 403) {
@@ -35,7 +41,7 @@ export const scraperSiteConnector: Connector = {
 
   async connect(input, deps) {
     const { siteUrl, username, password } = parseInput(ScraperSiteInput, input);
-    await checkReachable(deps.fetch, siteUrl);
+    await checkReachable(deps, siteUrl);
     return {
       config: { siteUrl, hasCredentials: Boolean(username && password) },
       secrets: compact({ username, password }),
@@ -45,7 +51,7 @@ export const scraperSiteConnector: Connector = {
 
   async verify(context) {
     try {
-      await checkReachable(context.fetch, requireString(context.connection.config, "siteUrl", SERVICE));
+      await checkReachable(context, requireString(context.connection.config, "siteUrl", SERVICE));
       return { status: "active", message: "Il sito risponde." };
     } catch (error) {
       return healthFromError(error);

@@ -59,6 +59,45 @@ export function isKnownEventType(type: string): boolean {
   return type in EVENT_TYPES || /^custom\.[a-z0-9_.]+$/.test(type);
 }
 
+/**
+ * Event types anyone holding a generic channel may create: the "Webhook in ingresso"
+ * connector, `logic.for_each`, a manager's test event. Every other type is reserved to the
+ * connector that verified its origin: an inbound message records consent and opens the
+ * WhatsApp window, a payment event marks a request as paid.
+ * Mirrored by `ia_connect.is_open_event_type` in the database (a test compares the two).
+ */
+export const OPEN_EVENT_TYPES = [
+  "quote.requested",
+  "order.created",
+  "listing.published",
+  "crm.record.created",
+  "crm.record.updated",
+] as const;
+
+export function isOpenEventType(type: string): boolean {
+  return (OPEN_EVENT_TYPES as readonly string[]).includes(type) || /^custom\.[a-z0-9_.]+$/.test(type);
+}
+
+/**
+ * Connector category a reserved event must come from. The worker gives an event of these
+ * types its special meaning (store a message, update a delivery status, settle a payment or
+ * a signature) only when `events.connection_id` is a connection of that category in the
+ * same organization.
+ */
+export const RESERVED_EVENT_SOURCES: Record<
+  string,
+  "whatsapp" | "mail" | "sms" | "social" | "payment" | "signature"
+> = {
+  "whatsapp.message.received": "whatsapp",
+  "whatsapp.status.updated": "whatsapp",
+  "mail.received": "mail",
+  "sms.received": "sms",
+  "sms.status.updated": "sms",
+  "social.message.received": "social",
+  "payment.completed": "payment",
+  "signature.completed": "signature",
+};
+
 /** Inbound message events: they resume a waiting run before triggering new flows. */
 export const INBOUND_MESSAGE_EVENTS: Record<string, "whatsapp" | "mail" | "sms" | "social"> = {
   "whatsapp.message.received": "whatsapp",

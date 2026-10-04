@@ -8,7 +8,7 @@ import {
   runRecipe,
   validateRows,
 } from "@ia-connect/core";
-import { type JobRow, consumeQuota, logAiCall, notify, quotaLeft } from "../db/repo.ts";
+import { type JobRow, consumeQuota, getConnection, logAiCall, notify, quotaLeft } from "../db/repo.ts";
 import { type Sql, iso, json } from "../db/sql.ts";
 import type { Deps, TraceResult } from "../deps.ts";
 import { errorMessage } from "../errors.ts";
@@ -26,6 +26,24 @@ async function loadRecipe(deps: Deps, job: JobRow): Promise<RecipeRow> {
   );
   if (!rows[0]) throw new RejectedJob("recipe not found in the job's organization");
   return rows[0];
+}
+
+/**
+ * Credentials for a recipe: the secrets of its connection, only when that connection belongs
+ * to the recipe's organization and is a "Sito o portale". `connection_id` is written by the
+ * customer: without these checks a recipe could name any connection (another organization's
+ * WhatsApp token) and type its secrets into a page of the customer's choice.
+ */
+export async function recipeSecrets(deps: Deps, recipe: RecipeRow): Promise<Record<string, unknown>> {
+  if (!recipe.connection_id) return {};
+  const connection = await getConnection(deps.sql, recipe.organization_id, recipe.connection_id);
+  if (!connection || connection.connector_type !== "scraper_site" || connection.status === "disconnected") {
+    deps.logger.warn("recipe connection ignored: not a site connection of the organization", {
+      recipeId: recipe.id,
+    });
+    return {};
+  }
+  return deps.secrets.read(connection.id);
 }
 
 /**
@@ -53,10 +71,16 @@ interface Attempt {
 }
 
 /** Replays a recipe in a fresh browser. Zero valid rows counts as a failure. */
-async function attempt(deps: Deps, recipe: ScrapeRecipe, secrets: Record<string, unknown>): Promise<Attempt> {
+async function attempt(
+  deps: Deps,
+  recipe: ScrapeRecipe,
+  secrets: Record<string, unknown>,
+  targetUrl: string,
+): Promise<Attempt> {
   const browser = await deps.openBrowser!();
   try {
-    const rows = await runRecipe(recipe, browser, secrets);
+    // Credentials are typed only on pages of the recipe's own site (`targetUrl`).
+    const rows = await runRecipe(recipe, browser, secrets, { targetUrl });
     const { valid, errors } = validateRows(recipe, rows);
     const error = valid.length
       ? null
@@ -113,7 +137,7 @@ async function saveVersion(
   const rows = await sql.query<{ id: string }>(
     `insert into ia_connect.scrape_recipe_versions (organization_id, recipe_id, version, recipe, generated_by, note)
      select $1, $2, coalesce(max(version), 0) + 1, $3::jsonb, 'ai', $4
-     from ia_connect.scrape_recipe_versions where recipe_id = $2
+     from ia_connect.scrape_recipe_versions where recipe_id = $2 and organization_id = $1
      returning id`,
     [recipe.organization_id, recipe.id, json(definition), note],
   );
@@ -206,11 +230,11 @@ export async function scrapeRun(deps: Deps, job: JobRow): Promise<JobResult> {
   }
 
   const versions = await deps.sql.query<{ recipe: unknown }>(
-    "select recipe from ia_connect.scrape_recipe_versions where id = $1 and recipe_id = $2",
-    [recipe.active_version_id, recipe.id],
+    "select recipe from ia_connect.scrape_recipe_versions where id = $1 and recipe_id = $2 and organization_id = $3",
+    [recipe.active_version_id, recipe.id, recipe.organization_id],
   );
   const parsed = ScrapeRecipeSchema.safeParse(versions[0]?.recipe);
-  const secrets = recipe.connection_id ? await deps.secrets.read(recipe.connection_id) : {};
+  const secrets = await recipeSecrets(deps, recipe);
   const succeed = async (definition: ScrapeRecipe, versionId: string, result: Attempt, repaired: boolean) => {
     const created = await emitRows(deps.sql, recipe, definition, result.valid, now);
     await finish({ versionId, status: "succeeded", attempt: result, created, repaired });
@@ -221,7 +245,7 @@ export async function scrapeRun(deps: Deps, job: JobRow): Promise<JobResult> {
   };
 
   const first: Attempt = parsed.success
-    ? await attempt(deps, parsed.data, secrets)
+    ? await attempt(deps, parsed.data, secrets, recipe.target_url)
     : { extracted: 0, valid: [], error: "La ricetta salvata non è valida." };
   if (!first.error && parsed.success) {
     await succeed(parsed.data, recipe.active_version_id, first, false);
@@ -242,7 +266,7 @@ export async function scrapeRun(deps: Deps, job: JobRow): Promise<JobResult> {
         traced.recipe,
         `Riparazione automatica: ${first.error ?? ""}`.slice(0, 500),
       );
-      const second = await attempt(deps, traced.recipe, secrets);
+      const second = await attempt(deps, traced.recipe, secrets, recipe.target_url);
       if (!second.error) {
         await succeed(traced.recipe, versionId, second, true);
         return { rescheduleAt };
@@ -278,7 +302,7 @@ export async function scrapeRun(deps: Deps, job: JobRow): Promise<JobResult> {
 /** First trace of a site (or a new one asked by the customer): the AI explores, the worker saves the recipe. */
 export async function scrapeTrace(deps: Deps, job: JobRow): Promise<JobResult> {
   const recipe = await loadRecipe(deps, job);
-  const secrets = recipe.connection_id ? await deps.secrets.read(recipe.connection_id) : {};
+  const secrets = await recipeSecrets(deps, recipe);
   let traced: TraceResult | undefined;
   let failure = "La tracciatura non è disponibile: crediti IA esauriti o servizio non configurato.";
   try {
@@ -289,7 +313,7 @@ export async function scrapeTrace(deps: Deps, job: JobRow): Promise<JobResult> {
   if (traced) {
     // The tracer proved the recipe on the browser it had explored (already logged in):
     // the scheduled runs start from a fresh one, so it is proved again from scratch.
-    const check = await attempt(deps, traced.recipe, secrets);
+    const check = await attempt(deps, traced.recipe, secrets, recipe.target_url);
     if (check.error) {
       failure = `la ricetta non funziona partendo da un browser appena aperto. ${check.error}`;
       traced = undefined;

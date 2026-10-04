@@ -22,6 +22,8 @@ export { webhookInboundConnector, InboundWebhookBody, WebhookInboundInput } from
 export { whatsappMetaConnector, WhatsAppMetaInput } from "./whatsapp-meta.ts";
 export { whatsappWaWebApiConnector, WAWEBAPI, WaWebApiInput } from "./whatsapp-wawebapi.ts";
 export { OAuthCallbackInput, RegisterWebhookInput } from "./lib/schemas.ts";
+export { nodeHostResolver } from "./lib/dns-node.ts";
+export { assertPublicHttpUrl, assertPublicTarget, guardedFetch } from "./lib/url.ts";
 export { IA_SIGNATURE_HEADER, REQUEST_URL_HEADER } from "./lib/webhook.ts";
 export {
   handleInboundWebhook,

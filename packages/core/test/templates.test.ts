@@ -27,4 +27,16 @@ describe("flow templates", () => {
   it("matches the SQL seed (run `npm run gen:seed` after editing templates)", () => {
     expect(readFileSync(SEED_PATH, "utf8")).toBe(renderSeed());
   });
+
+  it("the hardening migration carries the current order follow-up template (the seed file was already applied)", () => {
+    const sql = readFileSync(new URL("20261004001000_security_hardening.sql", SEED_PATH), "utf8");
+    const template = FLOW_TEMPLATES.find((item) => item.key === "ecommerce_order_followup")!;
+    expect(sql).toContain(
+      `set definition = '${JSON.stringify(template.definition).replace(/'/g, "''")}'::jsonb\nwhere key = 'ecommerce_order_followup';`,
+    );
+    const reply = template.definition.steps.find((step) => step.block === "ai.reply")!;
+    expect(reply.params.readResources).toEqual([
+      expect.objectContaining({ resource: "orders", matchContact: { field: "phone", by: "phone" } }),
+    ]);
+  });
 });

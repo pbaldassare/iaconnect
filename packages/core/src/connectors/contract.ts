@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { ConnectionStatus, ConnectorCategory } from "../domain.ts";
 import type { NormalizedEventInput } from "../events.ts";
+import type { HostResolver } from "../net.ts";
 
 /**
  * Contract every connector implements. The flow engine only knows this
@@ -32,6 +33,12 @@ export interface ConnectorContext {
   saveSecrets(secrets: Record<string, unknown>): Promise<void>;
   /** Platform-level settings (OAuth client ids, app secrets) from the environment. */
   env: Record<string, string | undefined>;
+  /**
+   * DNS lookup used to check customer-supplied hosts before connecting (SSRF guard).
+   * Provided by the worker and by the web server; absent in the edge function, where
+   * only the host name itself can be checked.
+   */
+  resolveHost?: HostResolver;
 }
 
 export interface HealthStatus {
@@ -107,7 +114,7 @@ export interface Connector {
   /** Completes the guided procedure. For OAuth, `input` holds `{ code, redirectUri }`. */
   connect(
     input: Record<string, unknown>,
-    deps: { fetch: typeof fetch; env: Record<string, string | undefined> },
+    deps: { fetch: typeof fetch; env: Record<string, string | undefined>; resolveHost?: HostResolver },
   ): Promise<ConnectResult>;
   /** Periodic health check; decides `connections.status`. */
   verify(context: ConnectorContext): Promise<HealthStatus>;

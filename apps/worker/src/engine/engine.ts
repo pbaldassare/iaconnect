@@ -39,12 +39,27 @@ export async function loadDefinition(
   run: RunRow,
 ): Promise<{ definition: FlowDefinition; flowName: string }> {
   const rows = await sql.query<{ definition: unknown; name: string }>(
-    `select v.definition, f.name from ia_connect.flow_versions v join ia_connect.flows f on f.id = v.flow_id
+    `select v.definition, f.name from ia_connect.flow_versions v
+     join ia_connect.flows f on f.id = v.flow_id and f.organization_id = v.organization_id
      where v.id = $1 and v.organization_id = $2`,
     [run.flow_version_id, run.organization_id],
   );
   if (!rows[0]) throw new Error(`flow version ${run.flow_version_id} not found`);
-  return { definition: FlowDefinitionSchema.parse(rows[0].definition), flowName: rows[0].name };
+  const parsed = FlowDefinitionSchema.safeParse(rows[0].definition);
+  if (!parsed.success) throw new InvalidDefinition(rows[0].name);
+  return { definition: parsed.data, flowName: rows[0].name };
+}
+
+/**
+ * Versions can be inserted straight into the database by a manager (RLS allows it): the
+ * definition is checked again every time a run starts or resumes, and a run over an invalid
+ * one fails cleanly instead of being retried forever.
+ */
+export class InvalidDefinition extends Error {
+  constructor(public readonly flowName: string) {
+    super("La definizione del flusso non è valida: salvare una nuova versione dall'editor.");
+    this.name = "InvalidDefinition";
+  }
 }
 
 /**
@@ -84,8 +99,9 @@ export async function signalRun(
     // The job delivering this signal is `running`, so only the other pending wake-ups are cancelled.
     await tx.query(
       `update ia_connect.scheduled_jobs set status = 'cancelled'
-       where flow_run_id = $1 and status = 'pending' and kind in ('resume_run', 'wait_timeout')`,
-      [run.id],
+       where flow_run_id = $1 and organization_id = $2 and status = 'pending'
+         and kind in ('resume_run', 'wait_timeout')`,
+      [run.id, organizationId],
     );
     return true;
   });
@@ -117,7 +133,26 @@ export async function executeRun(deps: Deps, runId: string): Promise<RunRow | un
       );
       return rows[0];
     }
-    const { definition, flowName } = await loadDefinition(deps.sql, run);
+    let loaded: Awaited<ReturnType<typeof loadDefinition>>;
+    try {
+      loaded = await loadDefinition(deps.sql, run);
+    } catch (error) {
+      if (!(error instanceof InvalidDefinition)) throw error;
+      const failed = run;
+      const stepId = failed.current_step_id ?? "?";
+      return await deps.sql.transaction((tx) =>
+        failRun(
+          tx,
+          deps,
+          failed,
+          failed.context as unknown as RunState,
+          { stepId, key: `${stepId}!definition`, block: "?", flowName: error.flowName },
+          error.message,
+          0,
+        ),
+      );
+    }
+    const { definition, flowName } = loaded;
     while (run.status === "running") {
       run = await executeStep(deps, run, definition, { id: org.id, name: org.name }, flowName);
       await deps.sql.query("update ia_connect.flow_runs set locked_until = $2::timestamptz where id = $1", [
@@ -179,8 +214,8 @@ async function executeStep(
 
   const existing = (
     await deps.sql.query<StepRow>(
-      "select * from ia_connect.flow_run_steps where flow_run_id = $1 and idempotency_key = $2",
-      [run.id, key],
+      "select * from ia_connect.flow_run_steps where flow_run_id = $1 and idempotency_key = $2 and organization_id = $3",
+      [run.id, key, run.organization_id],
     )
   )[0];
   // Already done (crash between a step and the next): reuse the stored outcome, never re-execute.

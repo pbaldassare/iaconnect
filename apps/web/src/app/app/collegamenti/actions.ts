@@ -4,11 +4,13 @@ import { canConnect } from "@/lib/connections/access";
 import { connectorErrorMessage, revealableSecrets, webhookExample } from "@/lib/connections/catalog";
 import { coerceFormValues, fieldErrorsFromIssues, schemaToFields } from "@/lib/connections/form-fields";
 import {
+  AccountAlreadyConnectedError,
+  connectDeps,
   connectorContext,
-  connectorEnv,
   readConnectionSecrets,
   registerWebhook,
   saveConnection,
+  writeConnection,
 } from "@/lib/connections/server";
 import { verifyConnectionJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
@@ -101,7 +103,7 @@ export async function connectWithForm(
 
   let result: Awaited<ReturnType<typeof connector.connect>>;
   try {
-    result = await connector.connect(coerced.input, { fetch, env: connectorEnv() });
+    result = await connector.connect(coerced.input, connectDeps());
   } catch (error) {
     return { status: "error", message: connectorErrorMessage(error), values };
   }
@@ -132,6 +134,9 @@ export async function connectWithForm(
       warnings: saved.warnings,
     };
   } catch (error) {
+    if (error instanceof AccountAlreadyConnectedError) {
+      return { status: "error", message: error.message, values };
+    }
     console.error("[connections] save failed", connector.key, (error as { code?: string })?.code ?? "");
     const base = failFromError(error);
     return { status: "error", message: base.ok ? "Operazione non riuscita." : base.message, values };
@@ -184,19 +189,20 @@ export async function checkConnectionNow(
     const service = createServiceClient();
     const secrets = await readConnectionSecrets(service, connection.id);
     health = await connector.verify(connectorContext(service, connection, secrets));
+    await writeConnection(service, {
+      actorId: context.session.user.id,
+      organizationId: context.org.organization.id,
+      connectionId: connection.id,
+      values: {
+        status: health.status,
+        last_checked_at: new Date().toISOString(),
+        last_error: health.status === "active" ? null : (health.message ?? null),
+      },
+    });
   } catch (error) {
+    if ((error as { code?: string })?.code) return failFromError(error);
     return fail(connectorErrorMessage(error));
   }
-  const { error } = await context.supabase
-    .from("connections")
-    .update({
-      status: health.status,
-      last_checked_at: new Date().toISOString(),
-      last_error: health.status === "active" ? null : (health.message ?? null),
-    })
-    .eq("id", connection.id)
-    .eq("organization_id", context.org.organization.id);
-  if (error) return failFromError(error);
   refresh(connection.id);
   if (health.status === "active") return ok(health.message ?? "Il collegamento funziona.");
   return fail(health.message ?? "Il collegamento non funziona ancora.");
@@ -212,10 +218,11 @@ export async function disconnectConnection(
   const connection = await loadConnection(context, connectionId);
   if (!connection) return fail("Collegamento non trovato.");
   const connector = getConnector(connection.connector_type);
+  if (!hasServiceKey()) return fail(new MissingServiceKeyError().message);
+  const service = createServiceClient();
   let providerNotified = false;
-  if (connector && hasServiceKey()) {
+  if (connector) {
     try {
-      const service = createServiceClient();
       const secrets = await readConnectionSecrets(service, connection.id);
       await connector.disconnect(connectorContext(service, connection, secrets));
       providerNotified = true;
@@ -223,12 +230,16 @@ export async function disconnectConnection(
       // Best effort: the connection is disconnected on our side anyway.
     }
   }
-  const { error } = await context.supabase
-    .from("connections")
-    .update({ status: "disconnected", last_error: null })
-    .eq("id", connection.id)
-    .eq("organization_id", context.org.organization.id);
-  if (error) return failFromError(error);
+  try {
+    await writeConnection(service, {
+      actorId: context.session.user.id,
+      organizationId: context.org.organization.id,
+      connectionId: connection.id,
+      values: { status: "disconnected", last_error: null },
+    });
+  } catch (error) {
+    return failFromError(error);
+  }
   refresh(connection.id);
   return ok(
     providerNotified

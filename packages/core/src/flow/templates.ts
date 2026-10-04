@@ -227,7 +227,12 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
             readResources: [
               {
                 resource: "orders",
-                description: "Ordini del negozio: cerca per numero d'ordine per leggere stato e spedizione",
+                description:
+                  "Ordini del contatto: cerca per numero d'ordine per leggere stato e spedizione. Vengono restituiti solo gli ordini di chi sta scrivendo.",
+                // Only the orders whose phone is the one writing: asking about someone
+                // else's order number returns nothing.
+                matchContact: { field: "phone", by: "phone" },
+                fields: ["orderNumber", "status", "total", "currency", "items", "trackingUrl", "shippedAt"],
               },
             ],
           },

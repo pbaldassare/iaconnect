@@ -37,6 +37,21 @@ export interface ValidationResult {
   issues: FlowIssue[];
 }
 
+/** One entry of `ai.reply` → `readResources`. */
+export interface ReadResource {
+  connection?: string;
+  resource: string;
+  description: string;
+  matchContact?: { field: string; by: "phone" | "email" };
+  fields?: string[];
+  public?: boolean;
+}
+
+/** A resource the assistant may read: bound to the run's contact, or explicitly public. */
+export function isReadableResource(resource: Pick<ReadResource, "matchContact" | "public">): boolean {
+  return Boolean(resource.matchContact) || resource.public === true;
+}
+
 const TEMPLATE_ROOTS = new Set(["event", "steps", "contact", "deal", "org", "reply"]);
 
 /**
@@ -153,6 +168,25 @@ export function validateFlow(input: unknown, context: ValidationContext): Valida
     ) {
       if (!step.params.stage.includes("{{") && !context.stages.includes(step.params.stage)) {
         error("stage", `La fase "${step.params.stage}" non esiste.`, step.id);
+      }
+    }
+
+    if (step.block === "ai.reply" && params.success) {
+      const resources = (params.data as { readResources: ReadResource[] }).readResources;
+      for (const resource of resources) {
+        if (!isReadableResource(resource)) {
+          error(
+            "read_resource",
+            `La risorsa "${resource.resource}" può essere letta dall'assistente solo se è legata al contatto ("matchContact": campo del gestionale che contiene il suo telefono o la sua mail) oppure dichiarata pubblica ("public": true). Senza una delle due chiunque scriva potrebbe leggere i dati di altri clienti.`,
+            step.id,
+          );
+        } else if (resource.matchContact && resource.public) {
+          warning(
+            "read_resource",
+            `La risorsa "${resource.resource}" è sia legata al contatto sia pubblica: vale il legame con il contatto.`,
+            step.id,
+          );
+        }
       }
     }
 

@@ -528,6 +528,7 @@ export interface Database {
           processed_at: string | null;
           created_at: string;
           updated_at: string;
+          created_by: string | null;
         };
         Insert: {
           id?: string;
@@ -546,6 +547,7 @@ export interface Database {
           processed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          created_by?: string | null;
         };
         Update: {
           id?: string;
@@ -564,6 +566,7 @@ export interface Database {
           processed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          created_by?: string | null;
         };
         Relationships: [];
       };
@@ -1528,6 +1531,19 @@ export interface Database {
       export_contact: { Args: { p_contact: string }; Returns: Json };
       export_organization: { Args: { p_org: string }; Returns: Json };
       delete_organization: { Args: { p_org: string }; Returns: undefined };
+      admin_delete_organization: { Args: { p_org: string }; Returns: undefined };
+      log_action: {
+        Args: { p_org: string; p_action: string; p_entity_type?: string | null; p_entity_id?: string | null; p_data?: Json };
+        Returns: undefined;
+      };
+      save_connection: {
+        Args: { p_actor: string; p_organization: string; p_connection: string | null; p_values: Json };
+        Returns: Database["ia_connect"]["Tables"]["connections"]["Row"];
+      };
+      remove_connection: {
+        Args: { p_actor: string; p_organization: string; p_connection: string };
+        Returns: undefined;
+      };
       store_connection_secret: { Args: { p_connection: string; p_secret: Json }; Returns: undefined };
       read_connection_secret: { Args: { p_connection: string }; Returns: Json };
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };

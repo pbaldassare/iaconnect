@@ -1,7 +1,12 @@
 import { canConnect } from "@/lib/connections/access";
 import { availablePages } from "@/lib/connections/catalog";
 import { OAUTH_STATE_COOKIE, verifyOAuthState } from "@/lib/connections/oauth-state";
-import { connectorEnv, oauthStateSecret, saveConnection } from "@/lib/connections/server";
+import {
+  AccountAlreadyConnectedError,
+  connectDeps,
+  oauthStateSecret,
+  saveConnection,
+} from "@/lib/connections/server";
 import { requireOrgManager } from "@/lib/session";
 import { hasServiceKey } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/url";
@@ -29,7 +34,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const back = (outcome: string) => finish(`/app/collegamenti?esito=${outcome}`);
 
   const secret = oauthStateSecret();
-  if (!secret || !hasServiceKey()) return back("chiave");
+  if (!secret) return back("segreto");
+  if (!hasServiceKey()) return back("chiave");
   const check = verifyOAuthState(
     request.cookies.get(OAUTH_STATE_COOKIE)?.value,
     { nonce: query.get("state"), connector: key },
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         code,
         redirectUri: `${base}/api/oauth/${connector.key}/callback`,
       },
-      { fetch, env: connectorEnv() },
+      connectDeps(),
     );
   } catch (error) {
     const codeOf = (error as { options?: { code?: string } })?.options?.code;
@@ -80,6 +86,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `/app/collegamenti/${saved.connection.id}?esito=${check.state.reconnect ? "ricollegato" : "collegato"}${choosePage ? "&passo=pagina" : ""}`,
     );
   } catch (error) {
+    if (error instanceof AccountAlreadyConnectedError) return back("gia_collegato");
     console.error("[oauth] save failed", connector.key, (error as { code?: string })?.code ?? "");
     return back("errore");
   }

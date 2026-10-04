@@ -11,6 +11,7 @@ import {
   FlowDefinitionSchema,
   MailSendInput,
   PaymentCreateLinkInput,
+  RESERVED_EVENT_SOURCES,
   SignatureCreateInput,
   SmsSendInput,
   SocialPublishPostInput,
@@ -244,22 +245,38 @@ export async function createHarness(
     createOrg,
     async addFlow(definition, { orgId = main.orgId, status = "active", name = "Flusso di prova" } = {}) {
       const parsed: FlowDefinition = FlowDefinitionSchema.parse(definition);
+      // Draft first: the database lets a flow become active only once it has its version.
       const flow = await one<{ id: string }>(
-        "insert into ia_connect.flows (organization_id, name, status, trigger_event) values ($1, $2, $3, $4) returning id",
-        [orgId, name, status, parsed.trigger.event],
+        "insert into ia_connect.flows (organization_id, name, status, trigger_event) values ($1, $2, 'draft', $3) returning id",
+        [orgId, name, parsed.trigger.event],
       );
       const version = await one<{ id: string }>(
         `insert into ia_connect.flow_versions (organization_id, flow_id, version, definition, author_type)
          values ($1, $2, 1, $3::jsonb, 'user') returning id`,
         [orgId, flow.id, JSON.stringify(definition)],
       );
-      await sql.query("update ia_connect.flows set active_version_id = $2 where id = $1", [
+      await sql.query("update ia_connect.flows set active_version_id = $2, status = $3 where id = $1", [
         flow.id,
         version.id,
+        status,
       ]);
       return { flowId: flow.id, versionId: version.id };
     },
-    async addEvent(type, payload, { orgId = main.orgId, connectionId = null, dedupeKey } = {}) {
+    async addEvent(type, payload, { orgId = main.orgId, connectionId, dedupeKey } = {}) {
+      // Reserved types count only when they come from a connection of the right kind: by
+      // default the event arrives from the organization's connection of that category, as
+      // it would from the real connector. Pass `connectionId: null` for an event without origin.
+      if (connectionId === undefined) {
+        const category = RESERVED_EVENT_SOURCES[type];
+        const found = category
+          ? await one<{ id: string } | undefined>(
+              `select c.id from ia_connect.connections c join ia_connect.connector_types t on t.key = c.connector_type
+               where c.organization_id = $1 and t.category = $2 order by c.created_at limit 1`,
+              [orgId, category],
+            )
+          : undefined;
+        connectionId = found?.id ?? null;
+      }
       const row = await one<{ id: string }>(
         `insert into ia_connect.events (organization_id, type, connection_id, payload, dedupe_key, occurred_at, available_at)
          values ($1, $2, $3, $4::jsonb, $5, $6::timestamptz, $6::timestamptz) returning id`,

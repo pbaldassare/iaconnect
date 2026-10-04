@@ -305,7 +305,7 @@ export async function createIntegration(
     async addFlow(definition, name = "Flusso di prova") {
       const parsed: FlowDefinition = FlowDefinitionSchema.parse(definition);
       const flow = await one<{ id: string }>(
-        "insert into ia_connect.flows (organization_id, name, status, trigger_event) values ($1, $2, 'active', $3) returning id",
+        "insert into ia_connect.flows (organization_id, name, status, trigger_event) values ($1, $2, 'draft', $3) returning id",
         [org.id, name, parsed.trigger.event],
       );
       const version = await one<{ id: string }>(
@@ -313,7 +313,7 @@ export async function createIntegration(
          values ($1, $2, 1, $3::jsonb, 'user') returning id`,
         [org.id, flow.id, JSON.stringify(definition)],
       );
-      await sql.query("update ia_connect.flows set active_version_id = $2 where id = $1", [
+      await sql.query("update ia_connect.flows set active_version_id = $2, status = 'active' where id = $1", [
         flow.id,
         version.id,
       ]);

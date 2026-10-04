@@ -121,6 +121,120 @@ describe.skipIf(!launch)("Playwright BrowserPort", () => {
   });
 });
 
+describe.skipIf(!launch)("egress of the scraping browser", () => {
+  // Two local servers behind made-up names: "public.test" is the site being read,
+  // "internal.test" stands for anything on our own network.
+  const hits = { site: [] as string[], internal: [] as string[] };
+  let site: Server;
+  let internal: Server;
+  let siteUrl = "";
+  let internalUrl = "";
+  let internalPort = 0;
+  const egress = async (hostname: string) => {
+    if (hostname === "public.test") return ["127.0.0.1"];
+    throw new Error(`refused: ${hostname}`);
+  };
+
+  beforeAll(async () => {
+    internal = createServer((request, response) => {
+      hits.internal.push(request.url ?? "");
+      response.writeHead(200, { "content-type": "text/html" });
+      response.end("<h1>segreto interno</h1>");
+    });
+    await new Promise<void>((resolve) => internal.listen(0, "127.0.0.1", resolve));
+    internalPort = (internal.address() as AddressInfo).port;
+    internalUrl = `http://internal.test:${internalPort}`;
+    site = createServer((request, response) => {
+      hits.site.push(request.url ?? "");
+      if (request.url === "/redirect") {
+        response.writeHead(302, { location: `${internalUrl}/via-redirect` });
+        response.end();
+        return;
+      }
+      if (request.url === "/chain") {
+        response.writeHead(302, { location: "/redirect" });
+        response.end();
+        return;
+      }
+      response.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      response.end(`<!doctype html><html><body><h1>Annunci</h1>
+        <ul><li class="card"><a class="title" href="/annunci/1">Trilocale 1</a></li></ul>
+        <img src="${internalUrl}/img">
+        <img src="http://127.0.0.1:${internalPort}/loopback-ip">
+        <img src="http://localhost:${internalPort}/loopback-name">
+        <iframe src="${internalUrl}/frame"></iframe>
+        <script>
+          fetch("${internalUrl}/fetch").catch(() => {});
+          fetch("http://[::1]:${internalPort}/v6").catch(() => {});
+          navigator.sendBeacon && navigator.sendBeacon("http://127.0.0.1:${internalPort}/beacon", "x");
+        </script>
+      </body></html>`);
+    });
+    await new Promise<void>((resolve) => site.listen(0, "127.0.0.1", resolve));
+    siteUrl = `http://public.test:${(site.address() as AddressInfo).port}`;
+  });
+  afterAll(async () => {
+    await new Promise((resolve) => site?.close(resolve));
+    await new Promise((resolve) => internal?.close(resolve));
+  });
+
+  it("reads the site through the proxy and lets no subresource reach the internal network", async () => {
+    const browser = await openPlaywrightBrowser({ launch, egress });
+    try {
+      await browser.goto(`${siteUrl}/`);
+      await browser.waitFor({ ms: 500 });
+      const rows = await browser.extractRows({
+        action: "extract",
+        listSelector: ".card",
+        fields: { title: { selector: ".title", attr: "text", transform: "trim" } },
+      });
+      expect(rows).toEqual([{ title: "Trilocale 1" }]);
+      expect(hits.site).toContain("/");
+      // Images, frames, fetch and beacons towards internal names, loopback and ::1: none arrived.
+      expect(hits.internal).toEqual([]);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it("does not follow a redirect from the public site to an internal address", async () => {
+    const browser = await openPlaywrightBrowser({ launch, egress });
+    try {
+      for (const path of ["/redirect", "/chain"]) {
+        await expect(browser.goto(`${siteUrl}${path}`), path).rejects.toThrow("rete interna");
+      }
+      expect(hits.site).toEqual(expect.arrayContaining(["/redirect", "/chain"]));
+      expect(hits.internal).toEqual([]);
+    } finally {
+      await browser.close();
+    }
+  });
+
+  it("with the default policy refuses loopback, private and metadata addresses and names that resolve to them", async () => {
+    const browser = await openPlaywrightBrowser({
+      launch,
+      // "rebind.test" has a public and a private address: one private address is enough.
+      resolveHost: async (hostname) =>
+        hostname === "rebind.test" ? ["93.184.216.34", "127.0.0.1"] : ["127.0.0.1"],
+    });
+    try {
+      for (const url of [
+        `http://127.0.0.1:${internalPort}/a`,
+        `http://[::ffff:127.0.0.1]:${internalPort}/b`,
+        "http://169.254.169.254/latest/meta-data/",
+        `http://host.docker.internal:${internalPort}/c`,
+        `http://rebind.test:${internalPort}/d`,
+        `http://looks-public.test:${internalPort}/e`,
+      ]) {
+        await expect(browser.goto(url), url).rejects.toThrow("rete interna");
+      }
+      expect(hits.internal).toEqual([]);
+    } finally {
+      await browser.close();
+    }
+  });
+});
+
 describe("scrape address guard", () => {
   it("accepts public http(s) addresses only", () => {
     expect(() => assertPublicUrl("https://www.example.com/annunci")).not.toThrow();
@@ -129,6 +243,12 @@ describe("scrape address guard", () => {
       "http://localhost:5432",
       "http://192.168.1.10/",
       "http://169.254.169.254/latest",
+      "http://[::ffff:127.0.0.1]/",
+      "http://100.64.0.1/",
+      "http://host.docker.internal/",
+      "http://[::]/",
+      "http://2130706433/",
+      "https://user:pw@www.example.com/",
       "javascript:alert(1)",
       "not a url",
     ]) {

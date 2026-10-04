@@ -1,5 +1,5 @@
 import { createClaudeAiService, traceScrapeRecipe } from "@ia-connect/ai";
-import { getConnector, listConnectors } from "@ia-connect/connectors";
+import { getConnector, listConnectors, nodeHostResolver } from "@ia-connect/connectors";
 import type { AiService } from "@ia-connect/core";
 import pg from "pg";
 import { createPgSql } from "./db/sql.ts";
@@ -45,13 +45,16 @@ async function main() {
     now: () => new Date(),
     logger,
     fetch: globalThis.fetch,
+    // Customer-supplied hosts (CRM address, site, mail servers) are checked against what they resolve to.
+    resolveHost: nodeHostResolver,
     config: {
       ...DEFAULT_CONFIG,
       maxAttempts: Number(env.WORKER_MAX_ATTEMPTS) || DEFAULT_CONFIG.maxAttempts,
       outboundOverride,
       env: connectorEnv(env),
     },
-    openBrowser: () => openPlaywrightBrowser(),
+    // All the browser's traffic goes through the egress proxy: public addresses only.
+    openBrowser: () => openPlaywrightBrowser({ resolveHost: nodeHostResolver }),
     tracer: apiKey ? (input) => traceScrapeRecipe({ apiKey, model: smartModel, ...input }) : undefined,
   };
 

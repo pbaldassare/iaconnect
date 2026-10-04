@@ -217,6 +217,38 @@ describe("generic inbound webhook signature (x-ia-signature)", () => {
     expect(second.events[0]?.dedupeKey).toBe(first.events[0]?.dedupeKey);
   });
 
+  it("refuses the event types reserved to provider connectors", async () => {
+    // A forged inbound WhatsApp message would record consent and open the 24-hour window;
+    // a forged payment would mark a request as paid.
+    for (const type of [
+      "whatsapp.message.received",
+      "whatsapp.status.updated",
+      "mail.received",
+      "sms.received",
+      "social.message.received",
+      "social.lead.received",
+      "payment.completed",
+      "signature.completed",
+      "scrape.item.found",
+      "manual.test",
+    ]) {
+      const body = JSON.stringify({ type, payload: { from: "+393331234567", text: "ciao" } });
+      const request = post(body, { [IA_SIGNATURE_HEADER]: `sha256=${hmacHex(signingSecret, body)}` });
+      const result = await webhookInboundConnector.handleWebhook!(context(), request);
+      expect(result.events, type).toEqual([]);
+      expect(result.response?.status, type).toBe(400);
+    }
+    for (const type of ["quote.requested", "order.created", "listing.published", "crm.record.updated"]) {
+      const body = JSON.stringify({ type, payload: {} });
+      const request = post(body, { [IA_SIGNATURE_HEADER]: `sha256=${hmacHex(signingSecret, body)}` });
+      const result = await webhookInboundConnector.handleWebhook!(context(), request);
+      expect(
+        result.events.map((event) => event.type),
+        type,
+      ).toEqual([type]);
+    }
+  });
+
   it("answers 400 and stores nothing for an unknown event type or a malformed body", async () => {
     for (const body of [
       JSON.stringify({ type: "not.a.type", payload: {} }),

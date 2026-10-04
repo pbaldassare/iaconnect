@@ -4,6 +4,8 @@ import {
   CrmReadInput,
   CrmWriteInput,
   NormalizedEventInputSchema,
+  OPEN_EVENT_TYPES,
+  isOpenEventType,
 } from "@ia-connect/core";
 import { z } from "zod";
 import { unsupportedAction } from "./lib/actions.ts";
@@ -31,7 +33,12 @@ export const WebhookInboundInput = z.object({
 
 /** Body the customer's site or management system posts. */
 export const InboundWebhookBody = z.object({
-  type: z.string().describe("Tipo di evento (es. quote.requested, order.created, custom.nome)"),
+  // Only the open types: whoever holds the signing secret must not be able to emit an inbound
+  // WhatsApp message or a completed payment, which the platform trusts as coming from a provider.
+  type: z
+    .string()
+    .refine(isOpenEventType, "Tipo di evento non ammesso")
+    .describe("Tipo di evento (es. quote.requested, order.created, custom.nome)"),
   dedupeKey: z.string().min(1).max(400).optional().describe("Chiave unica dell'evento, per evitare doppioni"),
   occurredAt: z.string().datetime({ offset: true }).optional().describe("Quando è avvenuto l'evento"),
   payload: z.record(z.string(), z.unknown()).describe("Dati dell'evento"),
@@ -45,8 +52,8 @@ export const webhookInboundConnector: Connector = {
   description: "Riceve eventi dal tuo sito o gestionale.",
   connectMode: "webhook",
   inputSchema: WebhookInboundInput,
-  // Any known event type or `custom.*`: the body declares it.
-  emits: ["quote.requested", "order.created", "crm.record.created", "crm.record.updated"],
+  // The body declares the type: one of the open types, or `custom.*`.
+  emits: [...OPEN_EVENT_TYPES],
 
   async connect(input) {
     const { signingSecret } = parseInput(WebhookInboundInput, input);

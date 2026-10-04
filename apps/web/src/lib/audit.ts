@@ -17,8 +17,12 @@ import type { Json } from "@ia-connect/core";
  * Name the action `<area>.<verb>` in English (e.g. "organization.export") and
  * add its Italian description to lib/audit-labels.ts.
  *
- * RLS (policy audit_insert) requires actor_id = the signed-in user and an
- * organization the user can access, so `supabase` must be the session client.
+ * Rows are written by the database function `ia_connect.log_action` (migration
+ * 20261004001000_security_hardening.sql), not by a direct insert: the function derives the
+ * actor from the session (who, customer or staff, support access, time), so nobody can log
+ * as someone else, as "admin", or with a date of their choice. `supabase` must be the session
+ * client. `actorId`, `actorType` and `isSupportAccess` are kept for the callers' readability
+ * and are NOT sent: the database decides them.
  * A failed audit write is logged on the server and never blocks the action.
  */
 export async function writeAudit(
@@ -36,15 +40,12 @@ export async function writeAudit(
     isSupportAccess?: boolean;
   },
 ): Promise<void> {
-  const { error } = await supabase.from("audit_log").insert({
-    organization_id: entry.organizationId,
-    actor_type: entry.actorType,
-    actor_id: entry.actorId,
-    action: entry.action,
-    entity_type: entry.entityType ?? null,
-    entity_id: entry.entityId ?? null,
-    data: entry.data ?? {},
-    is_support_access: entry.isSupportAccess ?? false,
+  const { error } = await supabase.rpc("log_action", {
+    p_org: entry.organizationId,
+    p_action: entry.action,
+    p_entity_type: entry.entityType ?? null,
+    p_entity_id: entry.entityId ?? null,
+    p_data: entry.data ?? {},
   });
   if (error) console.error("[audit] write failed", entry.action, error.code, error.message);
 }

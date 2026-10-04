@@ -4,11 +4,22 @@ import {
   type Channel,
   CrmReadOutput,
   type ExtractField,
+  type ReadResource,
   aiCallColumns,
+  getPath,
+  isReadableResource,
+  normalizePhone,
   parseDuration,
 } from "@ia-connect/core";
 import { offersAction, runAction } from "../../connectors.ts";
-import { addUsage, getContact, getSettings, quotaLeft, resolveConnection } from "../../db/repo.ts";
+import {
+  type ContactRow,
+  addUsage,
+  getContact,
+  getSettings,
+  quotaLeft,
+  resolveConnection,
+} from "../../db/repo.ts";
 import { StepError } from "../../errors.ts";
 import { sendFromFlow } from "../send.ts";
 import { type Executor, type StepContext, type StepResult, next } from "../types.ts";
@@ -75,7 +86,7 @@ interface ReplyParams {
   scope: string;
   maxTurns: number;
   idleTimeout: string;
-  readResources: { connection?: string; resource: string; description: string }[];
+  readResources: ReadResource[];
   channel?: Channel;
 }
 type History = { role: "contact" | "business"; content: string }[];
@@ -96,35 +107,90 @@ async function loadHistory(ctx: StepContext, conversationId: string): Promise<Hi
   const rows = await ctx.sql.query<{ direction: string; content: string }>(
     `select direction, content from (
        select direction, content, created_at from ia_connect.messages
-       where conversation_id = $1 and content <> '' order by created_at desc limit 30
+       where conversation_id = $1 and organization_id = $2 and content <> ''
+       order by created_at desc limit 30
      ) recent order by created_at`,
-    [conversationId],
+    [conversationId, ctx.org.id],
   );
   return rows.map((row) => ({ role: row.direction === "in" ? "contact" : "business", content: row.content }));
 }
 
-/** Read-only tools: each one reads a single CRM resource named by the flow. Nothing else is granted. */
-function buildTools(ctx: StepContext, params: ReplyParams): AiTool[] {
-  return params.readResources.map((item, index) => ({
-    name: `read_${item.resource.replace(/[^a-zA-Z0-9_]/g, "_")}_${index + 1}`,
-    description: item.description,
-    inputSchema: {
-      type: "object",
-      properties: {
-        query: { type: "object", description: 'Filtri di ricerca, ad esempio { "orderNumber": "123" }' },
+const MAX_TOOL_RECORDS = 20;
+
+/** The run's contact as the binding sees it: normalized phones, lower-case mails. */
+function contactValues(contact: ContactRow | undefined, by: "phone" | "email"): string[] {
+  if (!contact) return [];
+  return by === "phone"
+    ? contact.phones.map((phone) => normalizePhone(phone) ?? "").filter(Boolean)
+    : contact.emails.map((email) => email.trim().toLowerCase()).filter(Boolean);
+}
+
+function belongsTo(record: Record<string, unknown>, field: string, by: "phone" | "email", own: string[]) {
+  const raw = getPath(record, field);
+  if (typeof raw !== "string" && typeof raw !== "number") return false;
+  const value = by === "phone" ? normalizePhone(String(raw)) : String(raw).trim().toLowerCase();
+  return Boolean(value) && own.includes(value as string);
+}
+
+function pick(record: Record<string, unknown>, fields: string[] | undefined): Record<string, unknown> {
+  if (!fields) return record;
+  return Object.fromEntries(fields.filter((name) => name in record).map((name) => [name, record[name]]));
+}
+
+/**
+ * Read-only tools: each one reads a single CRM resource named by the flow. Nothing else is
+ * granted. The model's `query` is written by whoever is chatting, so the server decides whose
+ * records can come back: a resource bound to the contact (`matchContact`) gets the contact's
+ * phone or mail forced into the query and every returned record of someone else is dropped;
+ * a resource that is neither bound nor `public` is not offered at all.
+ */
+function buildTools(ctx: StepContext, params: ReplyParams, contact: ContactRow | undefined): AiTool[] {
+  const tools: AiTool[] = [];
+  params.readResources.forEach((item, index) => {
+    if (!isReadableResource(item)) {
+      ctx.deps.logger.warn("ai.reply resource without matchContact or public: not readable", {
+        runId: ctx.run.id,
+        stepId: ctx.step.id,
+        resource: item.resource,
+      });
+      return;
+    }
+    tools.push({
+      name: `read_${item.resource.replace(/[^a-zA-Z0-9_]/g, "_")}_${index + 1}`,
+      description: item.description,
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "object", description: 'Filtri di ricerca, ad esempio { "orderNumber": "123" }' },
+        },
       },
-    },
-    async run(input) {
-      if (ctx.simulation) return { records: [], note: "Simulazione: il gestionale non viene letto." };
-      const connection = await resolveConnection(ctx.sql, ctx.org.id, "crm", item.connection, null, (row) =>
-        offersAction(ctx.deps, row, "read"),
-      );
-      const query = input.query && typeof input.query === "object" ? input.query : {};
-      return CrmReadOutput.parse(
-        await runAction(ctx.deps, connection, "read", { resource: item.resource, query }),
-      );
-    },
-  }));
+      async run(input) {
+        if (ctx.simulation) return { records: [], note: "Simulazione: il gestionale non viene letto." };
+        const asked = input.query && typeof input.query === "object" ? input.query : {};
+        let query: Record<string, unknown> = { ...(asked as Record<string, unknown>) };
+        const binding = item.matchContact;
+        const own = binding ? contactValues(contact, binding.by) : [];
+        if (binding) {
+          if (own.length === 0) {
+            return { records: [], note: "Il contatto non ha un recapito con cui cercare i suoi dati." };
+          }
+          // The binding wins over whatever the model put in the same field.
+          query = { ...query, [binding.field]: own[0] };
+        }
+        const connection = await resolveConnection(ctx.sql, ctx.org.id, "crm", item.connection, null, (row) =>
+          offersAction(ctx.deps, row, "read"),
+        );
+        const { records } = CrmReadOutput.parse(
+          await runAction(ctx.deps, connection, "read", { resource: item.resource, query }),
+        );
+        const allowed = binding
+          ? records.filter((record) => belongsTo(record, binding.field, binding.by, own))
+          : records;
+        return { records: allowed.slice(0, MAX_TOOL_RECORDS).map((record) => pick(record, item.fields)) };
+      },
+    });
+  });
+  return tools;
 }
 
 async function generate(ctx: StepContext, params: ReplyParams, history: History, turn: number) {
@@ -137,7 +203,7 @@ async function generate(ctx: StepContext, params: ReplyParams, history: History,
       tone: settings.ai_tone ?? undefined,
       instructions: settings.ai_instructions ?? undefined,
       history,
-      tools: buildTools(ctx, params),
+      tools: buildTools(ctx, params, contact),
       contactMemory: contact?.memory || undefined,
       turn,
       maxTurns: params.maxTurns,

@@ -1,4 +1,12 @@
-import type { AiService, AiUsage, BrowserPort, Channel, Connector, ScrapeRecipe } from "@ia-connect/core";
+import type {
+  AiService,
+  AiUsage,
+  BrowserPort,
+  Channel,
+  Connector,
+  HostResolver,
+  ScrapeRecipe,
+} from "@ia-connect/core";
 import type { Sql } from "./db/sql.ts";
 import type { Logger } from "./log.ts";
 import type { SecretStore } from "./secrets.ts";
@@ -70,6 +78,11 @@ export interface Deps {
   logger: Logger;
   config: WorkerConfig;
   fetch: typeof fetch;
+  /**
+   * DNS lookup handed to connectors (`ConnectorContext.resolveHost`): customer-supplied hosts
+   * are checked against what they resolve to before any connection. Missing in tests.
+   */
+  resolveHost?: HostResolver;
   /** Opens a fresh browser for one scrape run. Missing = scraping unavailable. */
   openBrowser?: () => Promise<ClosableBrowser>;
   /** Missing = recipes cannot be traced or repaired (no AI key). */

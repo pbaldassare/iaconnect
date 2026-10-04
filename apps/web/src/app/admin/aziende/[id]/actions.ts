@@ -1,12 +1,14 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok, parseForm } from "@/lib/action";
 import { brandToJson, parseAccent, parseLogoUrl } from "@/lib/brand";
+import { writeConnection } from "@/lib/connections/server";
 import { KNOWN_FEATURES, isFeatureEnabled } from "@/lib/features";
 import { inviteToOrganization } from "@/lib/invitations";
 import { inviteOutcomeMessage } from "@/lib/invite-messages";
 import { setOrgCookie } from "@/lib/org-cookie";
 import { isUuid } from "@/lib/org-selection";
 import { requirePlatformAdmin, requireStaffForOrg } from "@/lib/session";
+import { MissingServiceKeyError, createServiceClient, hasServiceKey } from "@/lib/supabase/service";
 import { SECTORS } from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -140,15 +142,21 @@ export async function markConnectionDisconnected(
   _prev: ActionResult,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { supabase } = await requireStaffForOrg(organizationId);
+  const { session } = await requireStaffForOrg(organizationId);
   const connectionId = formData.get("connection_id");
   if (typeof connectionId !== "string" || !isUuid(connectionId)) return fail("Collegamento non valido.");
-  const { error } = await supabase
-    .from("connections")
-    .update({ status: "disconnected" })
-    .eq("id", connectionId)
-    .eq("organization_id", organizationId);
-  if (error) return failFromError(error);
+  if (!hasServiceKey()) return fail(new MissingServiceKeyError().message);
+  try {
+    // Connections are written by the server only, on behalf of the signed-in staff member.
+    await writeConnection(createServiceClient(), {
+      actorId: session.user.id,
+      organizationId,
+      connectionId,
+      values: { status: "disconnected" },
+    });
+  } catch (error) {
+    return failFromError(error);
+  }
   refresh(organizationId);
   return ok(
     "Collegamento segnato come scollegato. I flussi che lo usano si fermano finché il cliente non lo ricollega.",
@@ -288,7 +296,7 @@ export async function deleteOrganization(
       confirm: "Il nome non coincide.",
     });
   }
-  const { error } = await supabase.rpc("delete_organization", { p_org: organizationId });
+  const { error } = await supabase.rpc("admin_delete_organization", { p_org: organizationId });
   if (error) return failFromError(error);
   revalidatePath("/admin/aziende");
   redirect(`/admin/aziende?eliminata=${encodeURIComponent(organization.name)}`);

@@ -206,7 +206,7 @@ describe("ai.reply", () => {
           scope: "Domande sul preventivo",
           maxTurns: 2,
           idleTimeout: "24h",
-          readResources: [{ resource: "orders", description: "Ordini del negozio" }],
+          readResources: [{ resource: "orders", description: "Ordini del negozio", public: true }],
         },
         onHandoff: "notify",
         onTimeout: "end",

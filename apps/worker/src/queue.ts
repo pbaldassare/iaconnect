@@ -192,8 +192,10 @@ export async function scheduleJob(sql: Sql, input: ScheduleInput): Promise<void>
     `insert into ia_connect.scheduled_jobs (organization_id, kind, payload, run_at, flow_run_id, dedupe_key, created_by)
      values ($1, $2, $3::jsonb, $4::timestamptz, $5, $6, null)
      on conflict (dedupe_key) do update
+       -- The key is the worker's: whatever row holds it becomes this job again, whoever inserted it.
        set status = 'pending', attempts = 0, run_at = excluded.run_at, payload = excluded.payload,
-           locked_until = null, last_error = null`,
+           locked_until = null, last_error = null, organization_id = excluded.organization_id,
+           kind = excluded.kind, flow_run_id = excluded.flow_run_id, created_by = null`,
     [
       input.organizationId,
       input.kind,

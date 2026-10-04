@@ -4,6 +4,7 @@ import {
   ConnectorError,
   CrmReadInput,
   CrmWriteInput,
+  type HostResolver,
   type NormalizedEventInput,
 } from "@ia-connect/core";
 import { z } from "zod";
@@ -19,7 +20,7 @@ import {
   requireString,
   send,
 } from "./lib/http.ts";
-import { assertPublicHttpUrl, joinUrl } from "./lib/url.ts";
+import { assertPublicHttpUrl, guardedFetch, joinUrl } from "./lib/url.ts";
 import { type Json, asArray, asRecord, asString, getPath } from "./lib/values.ts";
 
 const SERVICE = "Gestionale";
@@ -103,6 +104,15 @@ function extractRecords(json: unknown, resource: Resource): Json[] {
   return source !== null && typeof source === "object" ? [asRecord(source)] : [];
 }
 
+/**
+ * The base address is the customer's: every request checks the host (name and, where the
+ * runtime can, DNS) and follows redirects one checked hop at a time, without carrying the
+ * authentication header to another origin.
+ */
+function safeFetch(deps: { fetch: typeof fetch; resolveHost?: HostResolver }): typeof fetch {
+  return guardedFetch(deps.fetch, SERVICE, deps.resolveHost);
+}
+
 async function list(
   context: ConnectorContext,
   config: Settings,
@@ -114,7 +124,7 @@ async function list(
     if (value === undefined || value === null) continue;
     params[key] = typeof value === "object" ? JSON.stringify(value) : String(value);
   }
-  const response = await request(context.fetch, SERVICE, joinUrl(config.baseUrl, resource.listPath), {
+  const response = await request(safeFetch(context), SERVICE, joinUrl(config.baseUrl, resource.listPath), {
     headers: config.headers,
     query: params,
   });
@@ -136,7 +146,7 @@ export const crmRestConnector: Connector = {
     const first = Object.values(config.resources)[0];
     if (first) {
       // Prove the address and the key work before saving anything.
-      const response = await request(deps.fetch, SERVICE, joinUrl(config.baseUrl, first.listPath), {
+      const response = await request(safeFetch(deps), SERVICE, joinUrl(config.baseUrl, first.listPath), {
         headers: { [config.authHeaderName]: authHeaderValue },
       });
       await response.body?.cancel().catch(() => undefined);
@@ -149,7 +159,7 @@ export const crmRestConnector: Connector = {
       const config = settings(context);
       const first = Object.values(config.resources)[0];
       if (!first) return { status: "error", message: "Nessuna risorsa configurata." };
-      const response = await send(context.fetch, SERVICE, joinUrl(config.baseUrl, first.listPath), {
+      const response = await send(safeFetch(context), SERVICE, joinUrl(config.baseUrl, first.listPath), {
         headers: config.headers,
       });
       await response.body?.cancel().catch(() => undefined);
@@ -229,7 +239,7 @@ export const crmRestConnector: Connector = {
           json: input.data,
         };
         const url = joinUrl(config.baseUrl, path.replace("{id}", encodeURIComponent(input.id ?? "")));
-        const json = asRecord(await readJson(await request(context.fetch, SERVICE, url, options)));
+        const json = asRecord(await readJson(await request(safeFetch(context), SERVICE, url, options)));
         const id =
           asString(json[resource.idField]) ?? asString(asRecord(json.data)[resource.idField]) ?? input.id;
         if (!id) {

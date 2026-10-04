@@ -192,7 +192,7 @@ describe("row level security", () => {
         "insert into ia_connect.connections (organization_id, connector_type, name) values ($1, 'gmail', 'x')",
         [ids.orgA],
       ),
-    ).rejects.toThrow(/row-level security/);
+    ).rejects.toThrow(/permission denied/);
     await expect(
       db.asUser(ids.memberA, "insert into ia_connect.flows (organization_id, name) values ($1, 'x')", [
         ids.orgA,
@@ -303,7 +303,9 @@ describe("quotas", () => {
 describe("invitations and GDPR", () => {
   it("turns a pending invitation into a membership at first login", async () => {
     const invited = (
-      await one<{ id: string }>("insert into auth.users (email) values ('nuovo@test.it') returning id")
+      await one<{ id: string }>(
+        "insert into auth.users (email, email_confirmed_at) values ('nuovo@test.it', now()) returning id",
+      )
     ).id;
     await db.asUser(
       ids.ownerA,
@@ -337,12 +339,12 @@ describe("invitations and GDPR", () => {
       db.asUser(ids.ownerA, "select ia_connect.export_organization($1)", [ids.orgB]),
     ).rejects.toThrow(/not allowed/);
     await expect(
-      db.asUser(ids.ownerA, "select ia_connect.delete_organization($1)", [ids.orgA]),
+      db.asUser(ids.ownerA, "select ia_connect.admin_delete_organization($1)", [ids.orgA]),
     ).rejects.toThrow(/not allowed/);
   });
 
   it("deletes an organization with everything it owns and keeps the audit trail", async () => {
-    await db.asUser(ids.admin, "select ia_connect.delete_organization($1)", [ids.orgB]);
+    await db.asUser(ids.admin, "select ia_connect.admin_delete_organization($1)", [ids.orgB]);
     const left = await one<{ n: number }>(
       "select (select count(*) from ia_connect.contacts where organization_id = $1)::int + (select count(*) from ia_connect.flow_versions where organization_id = $1)::int as n",
       [ids.orgB],

@@ -23,7 +23,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (!connector || connector.connectMode !== "oauth" || !connector.startOAuth) return back("errore");
   if (!(await canConnect(context, connector.key))) return back("permesso");
   const secret = oauthStateSecret();
-  if (!secret || !hasServiceKey()) return back("chiave");
+  if (!secret) return back("segreto");
+  if (!hasServiceKey()) return back("chiave");
 
   const reconnect = request.nextUrl.searchParams.get("ricollega");
   const page = request.nextUrl.searchParams.get("pagina");

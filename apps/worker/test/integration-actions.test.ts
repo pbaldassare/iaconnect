@@ -584,7 +584,9 @@ describe("management system (crm_rest) next to an inbound webhook connection", (
             scope: "Stato degli ordini del negozio.",
             maxTurns: 3,
             idleTimeout: "1h",
-            readResources: [{ resource: "ordini", description: "Cerca un ordine per numero (orderNumber)." }],
+            readResources: [
+              { resource: "ordini", description: "Cerca un ordine per numero (orderNumber).", public: true },
+            ],
           },
         },
       ],
@@ -648,6 +650,96 @@ describe("management system (crm_rest) next to an inbound webhook connection", (
     ).toBe("Il suo ordine A-77 è stato spedito con BRT.\n\nQuesto è un messaggio automatico.");
     expect((await t.one("select full_name from ia_connect.contacts")).full_name).toBe("Anna Bianchi");
     expect(await leaks(t, [CRM_KEY])).toEqual([]);
+  });
+
+  it("ai.reply returns only the records of the contact who is writing, and only the listed fields", async () => {
+    await setup();
+    await t.connect("whatsapp_meta", {
+      config: { phoneNumberId: PHONE_NUMBER_ID, wabaId: "102290129340398" },
+      secrets: { accessToken: "EAAG-wa" },
+      externalAccountId: PHONE_NUMBER_ID,
+    });
+    // Worst case: the management system ignores the filter and returns everybody's orders.
+    t.net.on("GET", ORDERS, {
+      data: [
+        { id: "A-77", status: "spedito", phone: "347 000 1122", address: "Via Roma 1", note: "interno" },
+        { id: "B-9", status: "in consegna", phone: "+39 333 999 8877", address: "Via Verdi 9, Milano" },
+        { id: "C-3", status: "annullato", address: "senza telefono" },
+      ],
+    });
+    t.net.on("POST", `${GRAPH}/${PHONE_NUMBER_ID}/messages`, { messages: [{ id: "wamid.OUT1" }] });
+    await t.addFlow({
+      trigger: { event: "whatsapp.message.received", filters: [] },
+      steps: [
+        {
+          id: "answer",
+          block: "ai.reply",
+          params: {
+            scope: "Stato degli ordini del negozio.",
+            maxTurns: 3,
+            idleTimeout: "1h",
+            readResources: [
+              {
+                resource: "ordini",
+                description: "Ordini del contatto.",
+                matchContact: { field: "phone", by: "phone" },
+                fields: ["id", "status"],
+              },
+              // Neither bound to the contact nor public: never offered to the model.
+              { resource: "clienti", description: "Anagrafica clienti." },
+            ],
+          },
+        },
+      ],
+    });
+    t.claude.push(
+      // The person asks about somebody else's order and tries to choose the phone filter too.
+      toolUse("read_ordini_1", { query: { orderNumber: "B-9", phone: "+393339998877" } }, "toolu_01"),
+      text({ text: "Non trovo un ordine B-9 a suo nome.", outcome: "done" }),
+    );
+    const delivery = {
+      object: "whatsapp_business_account",
+      entry: [
+        {
+          id: "102290129340398",
+          changes: [
+            {
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                metadata: { display_phone_number: "390212345678", phone_number_id: PHONE_NUMBER_ID },
+                contacts: [{ profile: { name: "Anna Bianchi" }, wa_id: "393470001122" }],
+                messages: [
+                  {
+                    from: "393470001122",
+                    id: "wamid.IN1",
+                    timestamp: String(Math.floor(t.now().getTime() / 1000)),
+                    type: "text",
+                    text: { body: "Dove viene consegnato l'ordine B-9?" },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      ],
+    };
+    expect((await t.webhook(metaWebhook("whatsapp_meta", delivery))).status).toBe(200);
+    await drain(t.deps);
+
+    expect(await lastRun(t)).toMatchObject({ status: "completed", error: null });
+    const [first, second] = t.claude.requests;
+    expect((first!.tools as { name: string }[]).map((tool) => tool.name)).toEqual(["read_ordini_1"]);
+    // The contact's own number replaces the one the model asked for.
+    const [read] = t.net.to(ORDERS);
+    expect(new URL(read!.url).searchParams.get("phone")).toBe("+393470001122");
+    const toolResult = (
+      second!.messages.at(-1)!.content as { type: string; tool_use_id: string; content: string }[]
+    )[0]!;
+    // Only the order of the person writing, and only the listed fields.
+    expect(JSON.parse(toolResult.content)).toEqual({ records: [{ id: "A-77", status: "spedito" }] });
+    expect(JSON.stringify(t.claude.requests)).not.toContain("Via Verdi");
+    expect(JSON.stringify(t.claude.requests)).not.toContain('B-9","status');
   });
 
   it("crm.read and crm.write use the connection that can read and write", async () => {

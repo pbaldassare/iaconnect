@@ -69,11 +69,25 @@ function fakeSite(site: { selector: string; rows: Record<string, unknown>[] }) {
   return { open, log };
 }
 
+/** The "Sito o portale" connection of the organization: the only kind a recipe takes credentials from. */
+async function siteConnection(harness: Harness): Promise<string> {
+  const existing = await harness.one(
+    "select id from ia_connect.connections where organization_id = $1 and connector_type = 'scraper_site'",
+    [harness.orgId],
+  );
+  if (existing) return existing.id as string;
+  const row = await harness.one(
+    "insert into ia_connect.connections (organization_id, connector_type, name) values ($1, 'scraper_site', 'Portale') returning id",
+    [harness.orgId],
+  );
+  return row.id as string;
+}
+
 async function addRecipe(harness: Harness, recipe: ScrapeRecipe | null, status = "active") {
   const row = await harness.one(
     `insert into ia_connect.scrape_recipes (organization_id, name, target_url, goal, connection_id, status, interval_minutes)
      values ($1, 'Portale', 'https://portale.example/annunci', 'Nuovi annunci', $2, $3, 60) returning id`,
-    [harness.orgId, harness.connections.crm, status],
+    [harness.orgId, await siteConnection(harness), status],
   );
   if (recipe) {
     const version = await harness.one(
@@ -100,7 +114,7 @@ describe("scrape_run", () => {
     };
     const fake = fakeSite(site);
     h.deps.openBrowser = fake.open;
-    await h.deps.secrets.write(h.connections.crm!, { password: "s3greta" });
+    await h.deps.secrets.write(await siteConnection(h), { password: "s3greta" });
     const recipeId = await addRecipe(h, recipeFor(".card"));
 
     await ensureRecurringJobs(h.deps);
@@ -118,7 +132,7 @@ describe("scrape_run", () => {
     expect(events[0]).toMatchObject({
       type: "listing.published",
       payload: { ...listing(1), recipeId },
-      connection_id: h.connections.crm,
+      connection_id: await siteConnection(h),
     });
     const runs = await h.all(
       "select status, rows_extracted, new_rows, needed_repair from ia_connect.scrape_runs order by created_at",
@@ -216,19 +230,16 @@ describe("scrape_run", () => {
 
   it("stops at the monthly scrape quota", async () => {
     h = await createHarness();
-    const poor = await h.createOrg("Senza letture", { scrape_runs_per_month: 0 });
+    // The organization's plan has no scrape runs left.
+    await h.sql.query(
+      `update ia_connect.plans set limits = limits || '{"scrape_runs_per_month": 0}'
+       where id = (select plan_id from ia_connect.organizations where id = $1)`,
+      [h.orgId],
+    );
     const fake = fakeSite({ selector: ".card", rows: [listing(1)] });
     h.deps.openBrowser = fake.open;
     const recipeId = await addRecipe(h, recipeFor(".card"));
-    await h.sql.query(
-      "update ia_connect.scrape_recipes set organization_id = $2, connection_id = null where id = $1",
-      [recipeId, poor.orgId],
-    );
-    await h.sql.query(
-      "update ia_connect.scrape_recipe_versions set organization_id = $2 where recipe_id = $1",
-      [recipeId, poor.orgId],
-    );
-    await h.addJob("scrape_run", { recipe_id: recipeId }, { orgId: poor.orgId });
+    await h.addJob("scrape_run", { recipe_id: recipeId });
     await drain(h.deps);
     expect(fake.log.opened).toBe(0);
     expect((await h.one("select error from ia_connect.scrape_runs")).error).toContain("esaurite");

@@ -43,8 +43,22 @@ firma non valida; `404` token o connettore sconosciuto, collegamento scollegato;
 fornitore riconsegna, le chiavi di deduplica scartano i doppioni). Le risposte di
 rifiuto non hanno corpo.
 
-Sulla rotta `/p/` vengono serviti solo i collegamenti con stato `active`; sulla rotta
-`/c/` tutti tranne quelli `disconnected`.
+Sulla rotta `/p/` vengono serviti solo i collegamenti con stato `active` **che hanno i
+segreti salvati**; sulla rotta `/c/` tutti tranne quelli `disconnected`.
+
+**Chi riceve una consegna sulla rotta `/p/`.** La firma è quella dell'app Meta, uguale per
+tutti i clienti: a decidere il destinatario sono `connections.external_account_id` e
+`config.accountAliases`. Per questo:
+
+- i clienti non scrivono `connections` (solo lettura e nome): le righe nascono dal server
+  dopo che `connector.connect` ha dimostrato, con il token del cliente, che l'account è suo;
+- un account può avere un solo collegamento non scollegato in tutta la piattaforma
+  (indice unico `connections_external_account_unique`);
+- un collegamento senza segreti non riceve nulla, qualunque account dichiari;
+- l'errore del gestore di **un** collegamento viene registrato e saltato: gli altri
+  collegamenti della stessa consegna sono serviti e la risposta resta `200`. Risponde `500`
+  (e il fornitore riconsegna) solo un guasto nostro: lettura dei segreti o salvataggio
+  degli eventi.
 
 ## Variabili d'ambiente
 
@@ -91,6 +105,10 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 - **Emette:** `mail.received`, tramite polling (cursore: ultimo UID e UIDVALIDITY).
 - **Offre:** `send` tramite SMTP.
 - Il collegamento prova entrambi gli accessi prima di salvare. Solo Node (worker).
+- I server IMAP e SMTP sono scritti dal cliente: prima di ogni connessione il nome e gli
+  indirizzi a cui si risolve devono essere pubblici, e la connessione va all'indirizzo
+  controllato (con il nome del server per il certificato TLS).
+- `nodemailer` 10 (la serie 6 aveva avvisi di sicurezza aperti).
 
 ### `whatsapp_meta` — WhatsApp Business (whatsapp, chiave)
 
@@ -127,8 +145,11 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
   controllo memorizza i record esistenti, i successivi segnalano quelli nuovi).
 - **Offre:** `read` (`query` diventa parametri dell'indirizzo), `write` (POST per creare,
   PUT o PATCH su `updatePath` con `{id}` per aggiornare).
-- Rifiuta indirizzi privati o locali. Il controllo è sul nome dell'host, non sul DNS né
-  sui reindirizzamenti: la rete del worker deve comunque bloccare gli indirizzi interni.
+- Rifiuta indirizzi privati, locali e interni (classificatore di `packages/core/src/net.ts`).
+  Ogni richiesta passa da `guardedFetch`: nome dell'host, risoluzione DNS (dove il runtime
+  la fornisce: worker e server web) e ogni passaggio di un reindirizzamento, seguito a mano
+  (massimo 5, solo letture) senza portare l'intestazione di autenticazione su un'altra
+  origine. Vedi «Indirizzi scritti dal cliente».
 
 ### `webhook_inbound` — Webhook in ingresso (crm, webhook)
 
@@ -136,8 +157,12 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 - **Webhook:** `…/webhook/c/<webhook_token>`, `POST` con JSON
   `{ "type", "dedupeKey"?, "occurredAt"?, "payload", "contact"? }` e intestazione
   `x-ia-signature: sha256=<HMAC-SHA256 esadecimale del corpo grezzo>`.
-- **Emette:** il tipo dichiarato nel corpo, se è nel catalogo o è `custom.*`. Senza
-  `dedupeKey` la chiave è l'hash del corpo. Un corpo non valido riceve `400`.
+- **Emette:** il tipo dichiarato nel corpo, solo se è uno dei tipi aperti
+  (`OPEN_EVENT_TYPES` in `packages/core`: `quote.requested`, `order.created`,
+  `listing.published`, `crm.record.created`, `crm.record.updated`) o `custom.*`. I tipi
+  riservati ai fornitori (messaggi in arrivo, stati di consegna, pagamenti, firme…) ricevono
+  `400`: chi possiede il segreto di firma non può fingere un messaggio WhatsApp o un
+  pagamento. Senza `dedupeKey` la chiave è l'hash del corpo. Un corpo non valido riceve `400`.
 - **Offre:** `read` e `write` rispondono con errore "non supportato" (non ritentabile) e
   sono marcate `unsupported: true` (`ActionDefinition`): il motore non sceglie mai questo
   collegamento per leggere o scrivere, anche se è della categoria `crm`.
@@ -200,7 +225,10 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
   (conservati come segreti).
 - **Emette:** nulla da solo; le ricette di scraping del worker emettono
   `scrape.item.found` e `listing.published` a nome del collegamento.
-- **Offre:** nessuna azione. `verify` controlla solo che il sito risponda.
+- **Offre:** nessuna azione. `verify` controlla solo che il sito risponda (con
+  `guardedFetch`: un sito pubblico che reindirizza verso un indirizzo interno è rifiutato).
+- L'`external_account_id` è il nome dell'host: più aziende possono leggere lo stesso sito
+  (escluso dall'indice unico).
 
 ### `payment_stripe` — Pagamenti (payment, chiave)
 
@@ -225,6 +253,25 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 - **Emette:** `signature.completed` quando riceve su `…/webhook/c/<webhook_token>` un
   `POST` `{ "externalId", "status": "signed", "documentUrl"? }` firmato con
   `x-ia-signature` (stesso schema di `webhook_inbound`).
+
+## Indirizzi scritti dal cliente
+
+`packages/connectors/src/lib/url.ts`:
+
+- `assertPublicHttpUrl(url, etichetta)`: solo http/https, senza credenziali, host pubblico
+  secondo `packages/core/src/net.ts` (privati, loopback, link-local, CGNAT, IPv4 dentro
+  IPv6, `*.internal`, `*.local`, `host.docker.internal`, nomi dei metadati…).
+- `assertPublicTarget(host, etichetta, resolveHost?)`: come sopra più **tutti** gli
+  indirizzi a cui il nome si risolve, quando il runtime passa un risolutore.
+- `guardedFetch(fetch, etichetta, resolveHost?)`: un `fetch` che applica i due controlli a
+  ogni passaggio (`redirect: "manual"`, massimo 5 reindirizzamenti).
+
+Il risolutore arriva da `ConnectorContext.resolveHost` (e dal terzo campo di `connect`):
+il worker e il server web passano `nodeHostResolver` (`lib/dns-node.ts`, `node:dns`);
+la funzione edge non può (niente `node:` in ciò che `webhooks.ts` importa: un test lo
+verifica) e lì vale solo il controllo sul nome. Rischio residuo: tra il controllo e la
+connessione di `fetch` il nome viene risolto di nuovo (DNS rebinding); la rete del worker
+deve bloccare comunque gli intervalli privati (vedi `docs/moduli/worker.md`).
 
 ## Limiti del contratto aggirati in locale
 

@@ -19,6 +19,12 @@ export const USER_JOB_KINDS = [
 ] as const;
 export type UserJobKind = (typeof USER_JOB_KINDS)[number];
 
+/**
+ * Every `scheduled_jobs.dedupe_key` of a job requested by a user starts with this (RLS policy
+ * `org_insert`). Keys without it belong to the worker (`poll:<id>`, `verify:<id>`, `scrape:<id>`…).
+ */
+export const USER_JOB_KEY_PREFIX = "user:";
+
 /** Same check the worker always applied to payload ids: 8-4-4-4-12 hex, any version. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const Id = z.string().regex(UUID, "not a uuid");
@@ -29,8 +35,17 @@ export const USER_JOB_PAYLOADS = {
   send_message: z.object({ message_id: Id }),
   /** The decision itself is read from `approvals`, never from the payload. */
   approval_decided: z.object({ approval_id: Id }),
-  /** `limit`: how many recent matching events to simulate (default 3). */
-  simulate_flow: z.object({ flow_version_id: Id, limit: z.number().int().min(1).max(10).optional() }),
+  /**
+   * `limit`: how many recent matching events to simulate (default 3).
+   * `sample`: simulate once over this made-up event instead (the "evento di prova" of a flow
+   * whose trigger is reserved to connectors, e.g. an inbound message: nothing real is stored
+   * and nothing is sent).
+   */
+  simulate_flow: z.object({
+    flow_version_id: Id,
+    limit: z.number().int().min(1).max(10).optional(),
+    sample: z.object({ payload: z.record(z.string(), z.unknown()) }).optional(),
+  }),
   scrape_run: z.object({ recipe_id: Id }),
   scrape_trace: z.object({ recipe_id: Id }),
   verify_connection: z.object({ connection_id: Id }),

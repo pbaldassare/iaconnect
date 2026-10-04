@@ -75,7 +75,7 @@ export async function deliver(deps: Deps, sql: Sql, delivery: Delivery) {
   // Message-ID (so the provider threads the reply), a social message goes out on the same platform.
   const answered =
     (delivery.channel === "mail" || delivery.channel === "social") && delivery.conversation
-      ? await lastInbound(sql, delivery.conversation.id)
+      ? await lastInbound(sql, delivery.organizationId, delivery.conversation.id)
       : undefined;
   try {
     const result = await runAction(deps, delivery.connection, ...actionFor(delivery, to, answered));
@@ -92,12 +92,16 @@ interface Answered {
   platform: string | null;
 }
 
-async function lastInbound(sql: Sql, conversationId: string): Promise<Answered | undefined> {
+async function lastInbound(
+  sql: Sql,
+  organizationId: string,
+  conversationId: string,
+): Promise<Answered | undefined> {
   const rows = await sql.query<Answered>(
     `select external_id, meta ->> 'platform' as platform from ia_connect.messages
-     where conversation_id = $1 and direction = 'in'
+     where conversation_id = $1 and organization_id = $2 and direction = 'in'
      order by created_at desc limit 1`,
-    [conversationId],
+    [conversationId, organizationId],
   );
   return rows[0];
 }

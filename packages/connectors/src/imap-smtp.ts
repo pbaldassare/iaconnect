@@ -7,16 +7,20 @@ import {
   type ConnectorContext,
   ConnectorError,
   type HealthStatus,
+  type HostResolver,
   MailSendInput,
   type NormalizedEventInput,
   type SendResult,
+  isIpAddress,
 } from "@ia-connect/core";
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import nodemailer from "nodemailer";
 import { z } from "zod";
 import { defineAction } from "./lib/actions.ts";
+import { nodeHostResolver } from "./lib/dns-node.ts";
 import { AUTH_EXPIRED, HEALTHY, healthFromError, parseInput, requireString } from "./lib/http.ts";
+import { assertPublicTarget } from "./lib/url.ts";
 import { asString, compact } from "./lib/values.ts";
 
 const SERVICE = "Casella IMAP/SMTP";
@@ -40,6 +44,12 @@ interface ServerOptions {
   port: number;
   secure: boolean;
   auth: { user: string; pass: string };
+  /**
+   * Set when `host` is the address the name was checked to resolve to: the name the
+   * certificate must match (ImapFlow reads `servername`, nodemailer `tls.servername`).
+   */
+  servername?: string;
+  tls?: { servername: string };
 }
 
 export interface ImapClientLike {
@@ -77,12 +87,15 @@ export interface ImapSmtpDeps {
   createImapClient(options: ServerOptions): ImapClientLike;
   createSmtpTransport(options: ServerOptions): SmtpTransportLike;
   parseMessage(source: Uint8Array): Promise<ParsedMailLike>;
+  /** DNS lookup for the host check, when the caller's context does not bring one. */
+  resolveHost?: HostResolver;
 }
 
 const defaultDeps: ImapSmtpDeps = {
   createImapClient: (options) => new ImapFlow({ ...options, logger: false }) as unknown as ImapClientLike,
   createSmtpTransport: (options) => nodemailer.createTransport(options) as unknown as SmtpTransportLike,
   parseMessage: async (source) => (await simpleParser(Buffer.from(source))) as unknown as ParsedMailLike,
+  resolveHost: nodeHostResolver,
 };
 
 /** Never forwards the library error: it can contain the server greeting or the username. */
@@ -166,6 +179,23 @@ export function parsedMailToEvent(
 }
 
 export function createImapSmtpConnector(deps: ImapSmtpDeps = defaultDeps): Connector {
+  /**
+   * The mail servers are typed by the customer: a host on our own network (localhost, a
+   * private address, the cloud metadata service) is refused before any socket is opened.
+   * With a resolver the connection then goes to the address that was checked, with the name
+   * kept for the TLS certificate: the name cannot resolve to something else in between.
+   */
+  async function safe(options: ServerOptions, from: { resolveHost?: HostResolver }): Promise<ServerOptions> {
+    const addresses = await assertPublicTarget(options.host, SERVICE, from.resolveHost ?? deps.resolveHost);
+    if (addresses.length === 0 || isIpAddress(options.host)) return options;
+    return {
+      ...options,
+      host: addresses[0]!,
+      servername: options.host,
+      tls: { servername: options.host },
+    };
+  }
+
   async function checkImap(options: ServerOptions): Promise<void> {
     const client = deps.createImapClient(options);
     try {
@@ -189,8 +219,8 @@ export function createImapSmtpConnector(deps: ImapSmtpDeps = defaultDeps): Conne
 
   async function verify(context: ConnectorContext): Promise<HealthStatus> {
     try {
-      await checkImap(imapOptions(context.connection.config, context.secrets));
-      await checkSmtp(smtpOptions(context.connection.config, context.secrets));
+      await checkImap(await safe(imapOptions(context.connection.config, context.secrets), context));
+      await checkSmtp(await safe(smtpOptions(context.connection.config, context.secrets), context));
       return HEALTHY;
     } catch (error) {
       return healthFromError(error);
@@ -206,18 +236,20 @@ export function createImapSmtpConnector(deps: ImapSmtpDeps = defaultDeps): Conne
     inputSchema: ImapSmtpInput,
     emits: ["mail.received"],
 
-    async connect(input) {
+    async connect(input, connectDeps) {
       const { password, ...config } = parseInput(ImapSmtpInput, input);
       const secrets = { password };
-      await checkImap(imapOptions(config, secrets));
-      await checkSmtp(smtpOptions(config, secrets));
+      await checkImap(await safe(imapOptions(config, secrets), connectDeps));
+      await checkSmtp(await safe(smtpOptions(config, secrets), connectDeps));
       return { config, secrets, externalAccountId: config.email };
     },
 
     verify,
 
     async poll(context, cursor) {
-      const client = deps.createImapClient(imapOptions(context.connection.config, context.secrets));
+      const client = deps.createImapClient(
+        await safe(imapOptions(context.connection.config, context.secrets), context),
+      );
       const events: NormalizedEventInput[] = [];
       try {
         await client.connect();
@@ -263,7 +295,9 @@ export function createImapSmtpConnector(deps: ImapSmtpDeps = defaultDeps): Conne
           const { config } = context.connection;
           const email = requireString(config, "email", SERVICE);
           const fromName = asString(config.fromName);
-          const transport = deps.createSmtpTransport(smtpOptions(config, context.secrets));
+          const transport = deps.createSmtpTransport(
+            await safe(smtpOptions(config, context.secrets), context),
+          );
           try {
             const info = await transport.sendMail(
               compact({

@@ -50,6 +50,16 @@ export function errorMessage(error: unknown): string {
   if (code === "42501" || /row-level security|not allowed|permission denied/i.test(message)) {
     return "Non hai i permessi per questa operazione.";
   }
+  if (code === "23505" && /connections_external_account_unique/.test(message)) {
+    return "Questo account è già collegato a un'altra azienda.";
+  }
+  if (code === "IAC01") {
+    return "Ci sono troppe richieste in attesa per la tua azienda: aspetta che le precedenti finiscano e riprova.";
+  }
+  if (code === "IAC02") {
+    return "Il piano non consente altri flussi attivi: metti in pausa un flusso oppure cambia piano.";
+  }
+  if (/messages cannot be edited/.test(message)) return "Un messaggio già scritto non si può modificare.";
   if (code === "23505") return "Esiste già un elemento con questi dati.";
   if (code === "23503")
     return "Questo elemento è collegato ad altri dati e non può essere modificato o eliminato così.";

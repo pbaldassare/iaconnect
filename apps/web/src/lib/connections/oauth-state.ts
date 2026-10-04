@@ -8,6 +8,20 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  */
 
 export const OAUTH_STATE_COOKIE = "oauth_state";
+
+/** Shown when OAUTH_STATE_SECRET is missing or too short. */
+export const OAUTH_STATE_SECRET_MISSING =
+  "Per i collegamenti con accesso dal fornitore (Google, Microsoft, Facebook) il server ha bisogno di OAUTH_STATE_SECRET: una stringa casuale di almeno 32 caratteri, da impostare nell'ambiente del server. Non è configurata.";
+
+/**
+ * Key that signs the OAuth state cookie: OAUTH_STATE_SECRET and nothing else. It used to fall
+ * back to the Supabase service key, which made one secret do two jobs (a signature oracle on
+ * the key that bypasses RLS). Null when missing or shorter than 32 characters.
+ */
+export function oauthStateSecretFrom(env: Record<string, string | undefined>): string | null {
+  const secret = env.OAUTH_STATE_SECRET?.trim() ?? "";
+  return secret.length >= 32 ? secret : null;
+}
 export const OAUTH_STATE_TTL_SECONDS = 600;
 
 export interface OAuthState {

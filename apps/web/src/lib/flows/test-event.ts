@@ -1,9 +1,17 @@
-import { type FlowDefinition, INBOUND_MESSAGE_EVENTS } from "@ia-connect/core";
+import { type FlowDefinition, INBOUND_MESSAGE_EVENTS, isOpenEventType } from "@ia-connect/core";
 
 /**
  * The "evento di prova" of the flow page: the `events` row the web inserts and the sample
  * content it proposes. Pure (no `server-only`, no `@/` imports): the worker's tests feed
  * the queue with exactly these rows.
+ *
+ * Two ways, chosen by `testEventMode`:
+ * - "event": a real `events` row, for `manual.test`, `custom.*` and the open business types
+ *   (the only ones RLS lets a manager insert). Active flows with that trigger run for real.
+ * - "simulation": for the types reserved to connectors (an inbound message, a delivery
+ *   status, a payment…). A made-up one would be taken as true (contact with consent, open
+ *   WhatsApp window, request marked as paid), so the flow is simulated over the sample
+ *   content instead (`simulateSampleJob`): nothing is stored, nothing is sent.
  *
  * What the worker's queue needs from the row (apps/worker/src/events.ts):
  * - `status` "pending" and `available_at` now: column defaults, never set here;
@@ -98,9 +106,17 @@ export function testEventProblem(type: string, payload: Record<string, unknown>)
   return null;
 }
 
-/** What the person is told about a test event that the worker treats as a received message. */
+/**
+ * "event": inserted as a real event. "simulation": the type is reserved to connectors, the
+ * test runs the flow in simulation over the sample content.
+ */
+export function testEventMode(type: string): "event" | "simulation" {
+  return type === "manual.test" || isOpenEventType(type) ? "event" : "simulation";
+}
+
+/** What the person is told about a test of a flow whose trigger only a connector can produce. */
 export const INBOUND_TEST_EVENT_NOTE =
-  "Un messaggio in arrivo di prova viene trattato come vero: crea (o aggiorna) il contatto del mittente e compare nell'Inbox.";
+  "Un evento di questo tipo può arrivare solo dal collegamento vero: la prova esegue il flusso in simulazione sul contenuto indicato, senza creare contatti e senza inviare messaggi.";
 
 /**
  * The `events` row for a test event. `connectionIds` are the organization's connections:

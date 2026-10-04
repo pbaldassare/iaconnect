@@ -4,6 +4,7 @@ import {
   type FlowDefinition,
   FlowDefinitionSchema,
   INBOUND_MESSAGE_EVENTS,
+  RESERVED_EVENT_SOURCES,
   evaluateFilter,
   getPath,
   normalizePhone,
@@ -18,6 +19,7 @@ import {
   createContact,
   findContact,
   findOrCreateConversation,
+  getConnection,
   getOrganization,
   toDate,
 } from "./db/repo.ts";
@@ -42,6 +44,14 @@ const INBOUND_CONSENT_SOURCE = "Messaggio ricevuto dal contatto";
 export async function processEvent(deps: Deps, event: EventRow): Promise<EventOutcome> {
   const org = await getOrganization(deps.sql, event.organization_id);
   if (!org || org.status !== "active") return { status: "ignored", note: "Azienda sospesa." };
+
+  // A reserved type means something only when it comes from a connection of the right kind
+  // in this organization: nobody else can open a WhatsApp window or mark a payment as paid.
+  const forged = await forgedReason(deps, event);
+  if (forged) {
+    deps.logger.warn("reserved event without a matching connection", { eventId: event.id, type: event.type });
+    return { status: "ignored", note: forged };
+  }
 
   const statusChannel = STATUS_EVENTS[event.type];
   if (statusChannel) await updateDeliveryStatus(deps.sql, event, statusChannel);
@@ -86,6 +96,19 @@ export async function processEvent(deps: Deps, event: EventRow): Promise<EventOu
   }
   if (flows.length || channel || statusChannel || settled) return { status: "processed" };
   return { status: "ignored", note: "Nessun flusso attivo per questo evento." };
+}
+
+// ── Origin of reserved events ──────────────────────────────────────────
+
+/** Why a reserved event is not trusted, in Italian; null when its origin is the expected one. */
+async function forgedReason(deps: Deps, event: EventRow): Promise<string | null> {
+  const category = RESERVED_EVENT_SOURCES[event.type];
+  if (!category) return null;
+  const connection = event.connection_id
+    ? await getConnection(deps.sql, event.organization_id, event.connection_id)
+    : undefined;
+  if (connection && connection.category === category) return null;
+  return `Evento "${event.type}" ignorato: non proviene da un collegamento di tipo ${category} di questa azienda.`;
 }
 
 // ── Delivery status ────────────────────────────────────────────────────
@@ -180,9 +203,10 @@ async function storeInbound(deps: Deps, event: EventRow, channel: Channel): Prom
     if (stored[0]) {
       // Same message from another event: a duplicate. From this event: a redelivery, carry on.
       if (stored[0].event_id !== event.id) return undefined;
-      const rows = await tx.query<ConversationRow>("select * from ia_connect.conversations where id = $1", [
-        stored[0].conversation_id,
-      ]);
+      const rows = await tx.query<ConversationRow>(
+        "select * from ia_connect.conversations where id = $1 and organization_id = $2",
+        [stored[0].conversation_id, event.organization_id],
+      );
       const conversation = rows[0]!;
       return { contactId: conversation.contact_id, conversation, messageId: stored[0].id, text };
     }
@@ -196,10 +220,10 @@ async function storeInbound(deps: Deps, event: EventRow, channel: Channel): Prom
       contact = await createContact(tx, event.organization_id, { ...keys, name, consents: consent });
     } else if (!contact.consents[channel]) {
       // Writing to us is consent for that channel; a recorded choice is left untouched.
-      await tx.query("update ia_connect.contacts set consents = consents || $2::jsonb where id = $1", [
-        contact.id,
-        json(consent),
-      ]);
+      await tx.query(
+        "update ia_connect.contacts set consents = consents || $2::jsonb where id = $1 and organization_id = $3",
+        [contact.id, json(consent), event.organization_id],
+      );
     }
 
     const conversation = await findOrCreateConversation(tx, {
@@ -228,12 +252,13 @@ async function storeInbound(deps: Deps, event: EventRow, channel: Channel): Prom
          status = 'open', unread_count = unread_count + 1, last_message_at = $2::timestamptz,
          window_expires_at = case when channel = 'whatsapp' then $3::timestamptz else window_expires_at end,
          external_thread_id = coalesce($4, external_thread_id)
-       where id = $1 returning *`,
+       where id = $1 and organization_id = $5 returning *`,
       [
         conversation.id,
         iso(occurredAt),
         iso(new Date(occurredAt.getTime() + 24 * 3_600_000)),
         typeof payload.threadId === "string" ? payload.threadId : null,
+        event.organization_id,
       ],
     );
     return { contactId: contact.id, conversation: updated[0]!, messageId: message[0]!.id, text };
@@ -259,7 +284,7 @@ async function resumeWaitingRun(
   }
   const waiting = await deps.sql.query<RunRow & { definition: unknown }>(
     `select r.*, v.definition from ia_connect.flow_runs r
-     join ia_connect.flow_versions v on v.id = r.flow_version_id
+     join ia_connect.flow_versions v on v.id = r.flow_version_id and v.organization_id = r.organization_id
      where r.organization_id = $1 and r.mode = 'live' and r.status = 'waiting' and r.waiting_for = 'reply'
        and (r.conversation_id = $2 or (r.conversation_id is null and r.contact_id = $3))
      order by r.updated_at desc limit 10`,
@@ -278,10 +303,10 @@ async function resumeWaitingRun(
     });
     if (!signalled) continue;
     if (!run.conversation_id) {
-      await deps.sql.query("update ia_connect.flow_runs set conversation_id = $2 where id = $1", [
-        run.id,
-        inbound.conversation.id,
-      ]);
+      await deps.sql.query(
+        "update ia_connect.flow_runs set conversation_id = $2 where id = $1 and organization_id = $3",
+        [run.id, inbound.conversation.id, event.organization_id],
+      );
     }
     await executeRun(deps, run.id);
     return true;
@@ -320,7 +345,9 @@ export function triggerMatches(definition: FlowDefinition, event: Parameters<typ
 async function matchFlows(deps: Deps, event: EventRow): Promise<MatchedFlow[]> {
   const rows = await deps.sql.query<{ flow_id: string; version_id: string; definition: unknown }>(
     `select f.id as flow_id, v.id as version_id, v.definition
-     from ia_connect.flows f join ia_connect.flow_versions v on v.id = f.active_version_id
+     from ia_connect.flows f
+     join ia_connect.flow_versions v
+       on v.id = f.active_version_id and v.flow_id = f.id and v.organization_id = f.organization_id
      where f.organization_id = $1 and f.status = 'active' and f.trigger_event = $2
      order by f.created_at`,
     [event.organization_id, event.type],
@@ -355,7 +382,7 @@ export async function createRun(
     definition: FlowDefinition;
     event:
       | Pick<EventRow, "id" | "type" | "payload" | "connection_id">
-      | { id: null; type: string; payload: object };
+      | { id: null; type: string; payload: object; connection_id?: string | null };
     mode: "live" | "simulation";
     contactId?: string | null;
     conversationId?: string | null;
@@ -366,7 +393,7 @@ export async function createRun(
       id: input.event.id,
       type: input.event.type,
       payload: input.event.payload as Record<string, unknown>,
-      connectionId: "connection_id" in input.event ? input.event.connection_id : null,
+      connectionId: input.event.connection_id ?? null,
     },
     input.definition,
   );
@@ -393,8 +420,8 @@ export async function createRun(
       return created[0];
     }
     const existing = await tx.query<RunRow>(
-      "select * from ia_connect.flow_runs where flow_version_id = $1 and event_id = $2 and mode = $3",
-      [input.versionId, input.event.id, input.mode],
+      "select * from ia_connect.flow_runs where flow_version_id = $1 and event_id = $2 and mode = $3 and organization_id = $4",
+      [input.versionId, input.event.id, input.mode, input.organizationId],
     );
     return existing[0]!;
   });

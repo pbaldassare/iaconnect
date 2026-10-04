@@ -6,6 +6,7 @@ import {
   ScrapeRecipeSchema,
   renderString,
   runRecipe,
+  secretUseProblem,
   validateRows,
 } from "@ia-connect/core";
 import { z } from "zod";
@@ -167,7 +168,7 @@ export async function traceScrapeRecipe(
     }
     let rows: Record<string, unknown>[];
     try {
-      rows = await runRecipe(parsed.data, browser, secrets);
+      rows = await runRecipe(parsed.data, browser, secrets, { targetUrl: input.url });
     } catch (error) {
       throw new Error(`La riesecuzione della ricetta si è interrotta: ${message(error)}`);
     }
@@ -206,6 +207,12 @@ export async function traceScrapeRecipe(
           throw new Error(
             "Le credenziali non sono disponibili durante questa tracciatura: il login non si può provare. Lascia i segnaposto nella ricetta.",
           );
+        }
+        if (/\{\{\s*secrets\./.test(value)) {
+          // A page can talk the model into opening another site: the stored credentials are
+          // typed only on the site being traced.
+          const problem = await secretUseProblem(browser, input.url);
+          if (problem) throw new Error(problem);
         }
         await browser.fill(text("selector"), String(renderString(value, { secrets }) ?? ""));
         return "Campo compilato.";

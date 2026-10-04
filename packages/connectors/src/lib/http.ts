@@ -74,7 +74,9 @@ export async function send(
       body,
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
-  } catch {
+  } catch (error) {
+    // A refusal of ours (address not allowed, redirect not followed) keeps its own message.
+    if (error instanceof ConnectorError) throw error;
     // The original error may contain the URL or headers: never propagate it.
     throw new ConnectorError(`${service}: servizio non raggiungibile`, { retryable: true, code: "network" });
   }

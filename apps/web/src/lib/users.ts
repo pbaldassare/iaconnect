@@ -1,5 +1,6 @@
 import "server-only";
 import { createServiceClient, hasServiceKey } from "@/lib/supabase/service";
+import { confirmedUserByEmail } from "@/lib/users-match";
 
 /**
  * Auth users are not readable through RLS: these helpers use the service
@@ -23,17 +24,16 @@ const PAGE_SIZE = 200;
 const MAX_PAGES = 25;
 
 /**
- * Finds an existing auth user by email (the Auth admin API has no lookup by
+ * Finds an existing auth user with a CONFIRMED email (the Auth admin API has no lookup by
  * email, so this pages through the users: fine up to a few thousand).
  * Throws MissingServiceKeyError when the key is not configured.
  */
 export async function findUserIdByEmail(email: string): Promise<string | null> {
-  const wanted = email.trim().toLowerCase();
   const service = createServiceClient();
   for (let page = 1; page <= MAX_PAGES; page++) {
     const { data, error } = await service.auth.admin.listUsers({ page, perPage: PAGE_SIZE });
     if (error) throw error;
-    const match = data.users.find((u) => u.email?.toLowerCase() === wanted);
+    const match = confirmedUserByEmail(data.users, email);
     if (match) return match.id;
     if (data.users.length < PAGE_SIZE) break;
   }

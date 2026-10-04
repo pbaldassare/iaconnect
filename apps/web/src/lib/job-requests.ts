@@ -1,4 +1,9 @@
-import { USER_JOB_PAYLOADS, type UserJobKind, type UserJobPayload } from "@ia-connect/core";
+import {
+  USER_JOB_KEY_PREFIX,
+  USER_JOB_PAYLOADS,
+  type UserJobKind,
+  type UserJobPayload,
+} from "@ia-connect/core";
 
 /**
  * Every job the web app asks the worker to run: kind, payload and dedupe key, built in
@@ -11,7 +16,11 @@ import { USER_JOB_PAYLOADS, type UserJobKind, type UserJobPayload } from "@ia-co
 export interface JobRequest<K extends UserJobKind = UserJobKind> {
   kind: K;
   payload: UserJobPayload<K>;
-  /** `scheduled_jobs.dedupe_key` is unique: a second insert with the same key fails with 23505. */
+  /**
+   * `scheduled_jobs.dedupe_key` is unique: a second insert with the same key fails with 23505.
+   * Always starts with `user:` (RLS refuses anything else): the keys without the prefix are
+   * the worker's own recurring jobs, which a customer must not be able to occupy.
+   */
   dedupeKey: string;
 }
 
@@ -19,7 +28,11 @@ const bucket = (now: Date, ms: number) => Math.floor(now.getTime() / ms);
 
 /** The operator's queued message. One job per message, ever. */
 export function sendMessageJob(messageId: string): JobRequest<"send_message"> {
-  return { kind: "send_message", payload: { message_id: messageId }, dedupeKey: `send_message:${messageId}` };
+  return {
+    kind: "send_message",
+    payload: { message_id: messageId },
+    dedupeKey: `${USER_JOB_KEY_PREFIX}send_message:${messageId}`,
+  };
 }
 
 /**
@@ -32,7 +45,7 @@ export function approvalDecidedJob(approvalId: string, decidedAt: Date): JobRequ
   return {
     kind: "approval_decided",
     payload: { approval_id: approvalId },
-    dedupeKey: `approval_decided:${approvalId}:${decidedAt.getTime()}`,
+    dedupeKey: `${USER_JOB_KEY_PREFIX}approval_decided:${approvalId}:${decidedAt.getTime()}`,
   };
 }
 
@@ -41,7 +54,23 @@ export function simulateFlowJob(flowVersionId: string, now: Date = new Date()): 
   return {
     kind: "simulate_flow",
     payload: { flow_version_id: flowVersionId },
-    dedupeKey: `simulate:${flowVersionId}:${bucket(now, 10_000)}`,
+    dedupeKey: `${USER_JOB_KEY_PREFIX}simulate:${flowVersionId}:${bucket(now, 10_000)}`,
+  };
+}
+
+/**
+ * The "evento di prova" of a flow triggered by an event reserved to connectors (an inbound
+ * message, a payment…): one simulation over the sample content. No event row is created.
+ */
+export function simulateSampleJob(
+  flowVersionId: string,
+  payload: Record<string, unknown>,
+  now: Date = new Date(),
+): JobRequest<"simulate_flow"> {
+  return {
+    kind: "simulate_flow",
+    payload: { flow_version_id: flowVersionId, sample: { payload } },
+    dedupeKey: `${USER_JOB_KEY_PREFIX}simulate-sample:${flowVersionId}:${bucket(now, 10_000)}`,
   };
 }
 
@@ -50,7 +79,7 @@ export function scrapeRunJob(recipeId: string, now: Date = new Date()): JobReque
   return {
     kind: "scrape_run",
     payload: { recipe_id: recipeId },
-    dedupeKey: `scrape-now:${recipeId}:${bucket(now, 60_000)}`,
+    dedupeKey: `${USER_JOB_KEY_PREFIX}scrape-now:${recipeId}:${bucket(now, 60_000)}`,
   };
 }
 
@@ -58,7 +87,7 @@ export function scrapeTraceJob(recipeId: string, now: Date = new Date()): JobReq
   return {
     kind: "scrape_trace",
     payload: { recipe_id: recipeId },
-    dedupeKey: `trace-now:${recipeId}:${bucket(now, 60_000)}`,
+    dedupeKey: `${USER_JOB_KEY_PREFIX}trace-now:${recipeId}:${bucket(now, 60_000)}`,
   };
 }
 
@@ -70,7 +99,7 @@ export function verifyConnectionJob(
   return {
     kind: "verify_connection",
     payload: { connection_id: connectionId },
-    dedupeKey: `verify-now:${connectionId}:${bucket(now, 60_000)}`,
+    dedupeKey: `${USER_JOB_KEY_PREFIX}verify-now:${connectionId}:${bucket(now, 60_000)}`,
   };
 }
 
