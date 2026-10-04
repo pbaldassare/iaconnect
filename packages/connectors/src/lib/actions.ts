@@ -25,7 +25,7 @@ export function unsupportedAction<S extends z.ZodType>(
   input: S,
   service: string,
 ): ActionDefinition<z.output<S>, never> {
-  return defineAction({
+  const action = defineAction<S, never>({
     key,
     title,
     input,
@@ -36,4 +36,5 @@ export function unsupportedAction<S extends z.ZodType>(
       });
     },
   });
+  return { ...action, unsupported: true };
 }

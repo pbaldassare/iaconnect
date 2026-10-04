@@ -64,6 +64,12 @@ export async function processEvent(deps: Deps, event: EventRow): Promise<EventOu
     const known = hint.phone || hint.email ? await findContact(deps.sql, org.id, hint) : undefined;
     link.contactId = known?.id ?? null;
   }
+  const settled = SETTLED_EVENTS[event.type];
+  if (settled) {
+    // The request's own contact wins over a hint taken from the provider's checkout form.
+    const contactId = await settleRequest(deps.sql, event, settled);
+    link.contactId = contactId ?? link.contactId;
+  }
 
   const flows = await matchFlows(deps, event);
   for (const flow of flows) {
@@ -78,7 +84,7 @@ export async function processEvent(deps: Deps, event: EventRow): Promise<EventOu
     });
     await executeRun(deps, run.id);
   }
-  if (flows.length || channel || statusChannel) return { status: "processed" };
+  if (flows.length || channel || statusChannel || settled) return { status: "processed" };
   return { status: "ignored", note: "Nessun flusso attivo per questo evento." };
 }
 
@@ -103,6 +109,35 @@ async function updateDeliveryStatus(sql: Sql, event: EventRow, channel: Channel)
       status === "failed" ? String(payload.error ?? "Consegna non riuscita.") : null,
     ],
   );
+}
+
+// ── Payments and signatures ────────────────────────────────────────────
+
+interface Settled {
+  table: "payment_requests" | "signature_requests";
+  field: string;
+  status: string;
+}
+
+const SETTLED_EVENTS: Record<string, Settled> = {
+  "payment.completed": { table: "payment_requests", field: "paymentRequestId", status: "paid" },
+  "signature.completed": { table: "signature_requests", field: "signatureRequestId", status: "signed" },
+};
+
+/**
+ * Marks the request a provider confirmed. Connectors identify it either with our own id
+ * (the `reference` we passed, e.g. Stripe) or with the id they returned when it was created.
+ */
+async function settleRequest(sql: Sql, event: EventRow, settled: Settled): Promise<string | null> {
+  const reference = (event.payload as Record<string, unknown>)[settled.field];
+  if (typeof reference !== "string" || !reference) return null;
+  const rows = await sql.query<{ contact_id: string | null }>(
+    `update ia_connect.${settled.table} set status = $3
+     where organization_id = $1 and (id::text = $2 or external_id = $2) and status in ('pending', $3)
+     returning contact_id`,
+    [event.organization_id, reference, settled.status],
+  );
+  return rows[0]?.contact_id ?? null;
 }
 
 // ── Inbound messages ───────────────────────────────────────────────────

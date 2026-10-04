@@ -1,5 +1,5 @@
 import { SendResultSchema, parseDuration } from "@ia-connect/core";
-import { runAction } from "../../connectors.ts";
+import { offersAction, runAction } from "../../connectors.ts";
 import {
   type ConversationRow,
   addUsage,
@@ -139,7 +139,7 @@ async function sendToOwner(
   try {
     const action = channel === "whatsapp" ? "sendText" : "send";
     const connection = await resolveConnection(ctx.sql, ctx.org.id, channel, null, null, (row) =>
-      Boolean(ctx.deps.connectors.get(row.connector_type)?.actions[action]),
+      offersAction(ctx.deps, row, action),
     );
     const to = overrideRecipient(ctx.deps.config, channel, address);
     consumed = await consumeQuota(ctx.sql, ctx.org.id, "messages");

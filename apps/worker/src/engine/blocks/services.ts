@@ -6,7 +6,7 @@ import {
   PaymentCreateLinkOutput,
   SignatureCreateOutput,
 } from "@ia-connect/core";
-import { runAction } from "../../connectors.ts";
+import { offersAction, runAction } from "../../connectors.ts";
 import { audit, getContact, resolveConnection } from "../../db/repo.ts";
 import { StepError } from "../../errors.ts";
 import { type Executor, type StepContext, next } from "../types.ts";
@@ -18,7 +18,7 @@ const connectionFor = (
   action: string,
 ) =>
   resolveConnection(ctx.sql, ctx.org.id, category, wanted, null, (row) =>
-    Boolean(ctx.deps.connectors.get(row.connector_type)?.actions[action]),
+    offersAction(ctx.deps, row, action),
   );
 
 function parseDate(value: string, label: string): Date {

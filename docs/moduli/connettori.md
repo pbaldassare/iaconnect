@@ -138,7 +138,9 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
   `x-ia-signature: sha256=<HMAC-SHA256 esadecimale del corpo grezzo>`.
 - **Emette:** il tipo dichiarato nel corpo, se è nel catalogo o è `custom.*`. Senza
   `dedupeKey` la chiave è l'hash del corpo. Un corpo non valido riceve `400`.
-- **Offre:** `read` e `write` rispondono con errore "non supportato" (non ritentabile).
+- **Offre:** `read` e `write` rispondono con errore "non supportato" (non ritentabile) e
+  sono marcate `unsupported: true` (`ActionDefinition`): il motore non sceglie mai questo
+  collegamento per leggere o scrivere, anche se è della categoria `crm`.
 - Il segreto esiste solo nel risultato di `connect`: chi chiama `connect` deve mostrarlo
   al cliente una volta, poi resta solo nel Vault.
 
@@ -184,7 +186,8 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 
 - **Il cliente fornisce:** Account SID, Auth Token, mittente (numero, nome alfanumerico
   o Messaging Service SID), facoltativo l'indirizzo per lo stato di consegna.
-- **Emette:** `sms.received`, `sms.status.updated`.
+- **Emette:** `sms.received`, `sms.status.updated` (lo stato `undelivered` di Twilio
+  diventa `failed`, l'unico esito negativo che la piattaforma conosce).
 - **Offre:** `send`.
 - **Webhook:** `…/webhook/c/<webhook_token>`, da impostare sul numero Twilio ("A message
   comes in", POST) e come `statusCallbackUrl` del collegamento.

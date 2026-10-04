@@ -13,6 +13,11 @@ export interface TraceInput {
   goal: string;
   browser: BrowserPort;
   hasCredentials: boolean;
+  /**
+   * Values for the `{{secrets.<name>}}` placeholders. The tracer fills them in the browser
+   * and hides them from the model: the one mechanism for credentials while tracing.
+   */
+  secrets?: Record<string, unknown>;
   previous?: { recipe: ScrapeRecipe; error: string };
 }
 export interface TraceResult {
@@ -74,6 +79,17 @@ export interface Deps {
 /** Growing wait between attempts: base, 2×, 4×… capped at one hour. */
 export function backoffMs(config: WorkerConfig, attempt: number): number {
   return Math.min(config.backoffBaseMs * 2 ** Math.max(0, attempt - 1), 3_600_000);
+}
+
+/** Environment variables connectors may read: platform OAuth apps and webhook settings, nothing else. */
+const CONNECTOR_ENV = /^(GOOGLE|MICROSOFT|META|WAWEBAPI|WEBHOOK)_/;
+
+/**
+ * What goes into `ConnectorContext.env`. The worker's own secrets (database URL, AI key,
+ * Supabase keys) are never handed to connector code.
+ */
+export function connectorEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {
+  return Object.fromEntries(Object.entries(env).filter(([name]) => CONNECTOR_ENV.test(name)));
 }
 
 /** Parses OUTBOUND_OVERRIDE_RECIPIENT (comma separated phones/mails) and WHATSAPP_TEST_RECIPIENT. */

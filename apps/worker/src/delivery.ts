@@ -19,7 +19,7 @@ export interface Delivery {
   connection: ConnectionRow;
   contact: Pick<ContactRow, "consents">;
   /** Missing for a first message: the WhatsApp window is then closed by definition. */
-  conversation?: Pick<ConversationRow, "window_expires_at" | "external_thread_id">;
+  conversation?: Pick<ConversationRow, "id" | "window_expires_at" | "external_thread_id">;
   to: string;
   text: string;
   subject?: string;
@@ -71,8 +71,14 @@ export async function deliver(deps: Deps, sql: Sql, delivery: Delivery) {
   if (!(await consumeQuota(sql, delivery.organizationId, "messages"))) {
     throw new StepError("Invio rifiutato: i messaggi del mese previsti dal piano sono esauriti.", "quota");
   }
+  // An answer follows the last message received in the conversation: a mail carries its
+  // Message-ID (so the provider threads the reply), a social message goes out on the same platform.
+  const answered =
+    (delivery.channel === "mail" || delivery.channel === "social") && delivery.conversation
+      ? await lastInbound(sql, delivery.conversation.id)
+      : undefined;
   try {
-    const result = await runAction(deps, delivery.connection, ...actionFor(delivery, to));
+    const result = await runAction(deps, delivery.connection, ...actionFor(delivery, to, answered));
     return SendResultSchema.parse(result);
   } catch (error) {
     // Nothing was sent as far as we know: give the message back to the quota.
@@ -81,7 +87,22 @@ export async function deliver(deps: Deps, sql: Sql, delivery: Delivery) {
   }
 }
 
-function actionFor(delivery: Delivery, to: string): [string, Record<string, unknown>] {
+interface Answered {
+  external_id: string | null;
+  platform: string | null;
+}
+
+async function lastInbound(sql: Sql, conversationId: string): Promise<Answered | undefined> {
+  const rows = await sql.query<Answered>(
+    `select external_id, meta ->> 'platform' as platform from ia_connect.messages
+     where conversation_id = $1 and direction = 'in'
+     order by created_at desc limit 1`,
+    [conversationId],
+  );
+  return rows[0];
+}
+
+function actionFor(delivery: Delivery, to: string, answered?: Answered): [string, Record<string, unknown>] {
   switch (delivery.channel) {
     case "whatsapp":
       return delivery.template
@@ -104,11 +125,15 @@ function actionFor(delivery: Delivery, to: string): [string, Record<string, unkn
           subject: delivery.subject ?? "",
           text: delivery.text,
           threadId: delivery.conversation?.external_thread_id ?? undefined,
+          inReplyTo: answered?.external_id ?? undefined,
         },
       ];
     case "sms":
       return ["send", { to, text: delivery.text }];
     case "social":
-      return ["sendMessage", { to, text: delivery.text, platform: delivery.platform }];
+      return [
+        "sendMessage",
+        { to, text: delivery.text, platform: delivery.platform ?? answered?.platform ?? undefined },
+      ];
   }
 }

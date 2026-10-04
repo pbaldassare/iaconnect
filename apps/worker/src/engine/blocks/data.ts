@@ -7,7 +7,7 @@ import {
   evaluateFilter,
   getPath,
 } from "@ia-connect/core";
-import { runAction } from "../../connectors.ts";
+import { offersAction, runAction } from "../../connectors.ts";
 import {
   type ContactRow,
   audit,
@@ -251,9 +251,7 @@ export const dealUpdateStage: Executor<{ stage: string; nextAction?: string }> =
 };
 
 const crmConnection = (ctx: StepContext, wanted: string | undefined, action: string) =>
-  resolveConnection(ctx.sql, ctx.org.id, "crm", wanted, null, (row) =>
-    Boolean(ctx.deps.connectors.get(row.connector_type)?.actions[action]),
-  );
+  resolveConnection(ctx.sql, ctx.org.id, "crm", wanted, null, (row) => offersAction(ctx.deps, row, action));
 
 export const crmRead: Executor<{ connection?: string; resource: string; query: Record<string, unknown> }> = {
   async run(ctx, params) {

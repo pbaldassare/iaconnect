@@ -1,10 +1,9 @@
 import {
-  type BrowserPort,
+  type AiUsage,
   type Row,
   type ScrapeRecipe,
   ScrapeRecipeSchema,
   creditsFor,
-  renderString,
   runRecipe,
   validateRows,
 } from "@ia-connect/core";
@@ -29,16 +28,21 @@ async function loadRecipe(deps: Deps, job: JobRow): Promise<RecipeRow> {
 }
 
 /**
- * The tracer drives the browser but never sees credentials: it writes `{{secrets.<name>}}`
- * and this wrapper fills in the value, exactly as `runRecipe` does later.
+ * Browser errors can quote what was typed (Playwright's call log shows the filled value):
+ * credentials are blanked before a message is stored or shown.
  */
-export function withSecrets(browser: BrowserPort, secrets: Record<string, unknown>): BrowserPort {
-  const render = (value: string) => String(renderString(value, { secrets }) ?? "");
-  return {
-    ...browser,
-    goto: (url) => browser.goto(render(url)),
-    fill: (selector, value) => browser.fill(selector, render(value)),
-  };
+export function hideSecrets(text: string, secrets: Record<string, unknown>): string {
+  return Object.values(secrets)
+    .filter((value): value is string => typeof value === "string" && value.length >= 3)
+    .sort((a, b) => b.length - a.length)
+    .reduce((out, secret) => out.split(secret).join("[segreto]"), text);
+}
+
+function usageOf(error: unknown): AiUsage | undefined {
+  const usage = (error as { usage?: Partial<AiUsage> } | null)?.usage;
+  return usage && typeof usage.model === "string" && typeof usage.inputTokens === "number"
+    ? (usage as AiUsage)
+    : undefined;
 }
 
 interface Attempt {
@@ -60,7 +64,7 @@ async function attempt(deps: Deps, recipe: ScrapeRecipe, secrets: Record<string,
         : "Nessuna riga estratta dalla pagina.";
     return { extracted: rows.length, valid, error };
   } catch (error) {
-    return { extracted: 0, valid: [], error: errorMessage(error) };
+    return { extracted: 0, valid: [], error: hideSecrets(errorMessage(error), secrets) };
   } finally {
     await browser.close().catch(() => undefined);
   }
@@ -129,23 +133,28 @@ async function trace(
   if (!deps.tracer || !deps.openBrowser) return undefined;
   const left = await quotaLeft(deps.sql, recipe.organization_id, "ai_credits");
   if (left !== null && left <= 0) return undefined;
+  const hasCredentials = Object.keys(secrets).length > 0;
+  const purpose = previous ? "scrape_repair" : "scrape_trace";
   const browser = await deps.openBrowser();
   try {
     const result = await deps.tracer({
       url: recipe.target_url,
       goal: recipe.goal,
-      browser: withSecrets(browser, secrets),
-      hasCredentials: Object.keys(secrets).length > 0,
+      browser,
+      hasCredentials,
+      // The tracer replaces `{{secrets.<name>}}` itself and hides the values from the model.
+      secrets: hasCredentials ? secrets : undefined,
       previous,
     });
-    await logAiCall(
-      deps.sql,
-      recipe.organization_id,
-      previous ? "scrape_repair" : "scrape_trace",
-      result.usage,
-      creditsFor(result.usage),
-    );
+    await logAiCall(deps.sql, recipe.organization_id, purpose, result.usage, creditsFor(result.usage));
     return { ...result, recipe: ScrapeRecipeSchema.parse(result.recipe) };
+  } catch (error) {
+    // A tracing that fails after spending tokens (`AiOperationError`) is metered all the same.
+    const usage = usageOf(error);
+    if (usage && usage.inputTokens + usage.outputTokens > 0) {
+      await logAiCall(deps.sql, recipe.organization_id, purpose, usage, creditsFor(usage));
+    }
+    throw new Error(hideSecrets(errorMessage(error), secrets));
   } finally {
     await browser.close().catch(() => undefined);
   }
@@ -276,6 +285,15 @@ export async function scrapeTrace(deps: Deps, job: JobRow): Promise<JobResult> {
     traced = await trace(deps, recipe, secrets);
   } catch (error) {
     failure = errorMessage(error);
+  }
+  if (traced) {
+    // The tracer proved the recipe on the browser it had explored (already logged in):
+    // the scheduled runs start from a fresh one, so it is proved again from scratch.
+    const check = await attempt(deps, traced.recipe, secrets);
+    if (check.error) {
+      failure = `la ricetta non funziona partendo da un browser appena aperto. ${check.error}`;
+      traced = undefined;
+    }
   }
   if (!traced) {
     await notify(deps.sql, recipe.organization_id, {

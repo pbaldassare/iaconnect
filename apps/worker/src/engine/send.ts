@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { type Channel, type ContactConsents, normalizePhone } from "@ia-connect/core";
+import { offersAction } from "../connectors.ts";
 import {
   CHANNEL_LABELS,
   type ContactRow,
@@ -108,7 +109,7 @@ export async function sendFromFlow(ctx: StepContext, message: FlowMessage) {
     message.channel,
     message.connectionId,
     sameThread ? current.connection_id : null,
-    (row) => Boolean(deps.connectors.get(row.connector_type)?.actions[ACTION_BY_CHANNEL[message.channel]]),
+    (row) => offersAction(deps, row, ACTION_BY_CHANNEL[message.channel]),
   );
   const conversation =
     sameThread && current.connection_id === connection.id

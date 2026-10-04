@@ -7,7 +7,7 @@ import {
   creditsFor,
   parseDuration,
 } from "@ia-connect/core";
-import { runAction } from "../../connectors.ts";
+import { offersAction, runAction } from "../../connectors.ts";
 import { addUsage, getContact, getSettings, quotaLeft, resolveConnection } from "../../db/repo.ts";
 import { StepError } from "../../errors.ts";
 import { sendFromFlow } from "../send.ts";
@@ -117,7 +117,7 @@ function buildTools(ctx: StepContext, params: ReplyParams): AiTool[] {
     async run(input) {
       if (ctx.simulation) return { records: [], note: "Simulazione: il gestionale non viene letto." };
       const connection = await resolveConnection(ctx.sql, ctx.org.id, "crm", item.connection, null, (row) =>
-        Boolean(ctx.deps.connectors.get(row.connector_type)?.actions.read),
+        offersAction(ctx.deps, row, "read"),
       );
       const query = input.query && typeof input.query === "object" ? input.query : {};
       return CrmReadOutput.parse(

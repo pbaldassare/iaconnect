@@ -22,6 +22,9 @@ che cambia da un'azienda all'altra sta nel database.
      una persona → nessuna automazione; un flusso in attesa di risposta su quella
      conversazione → riprende; altrimenti cerca i flussi attivi.
    - Stato di consegna → aggiorna `messages.delivery_status` (mai all'indietro).
+   - `payment.completed` e `signature.completed` → la richiesta di pagamento o di
+     firma indicata dall'evento (con il nostro id o con quello del fornitore) passa
+     a `paid` / `signed`; i flussi avviati dall'evento ricevono il suo contatto.
    - Flussi attivi con lo stesso evento, collegamento e filtri → crea
      `flow_runs` (una sola per evento e versione) ed esegue.
 3. **Motore.** Un passo alla volta; dopo ogni passo salva posizione e contesto
@@ -40,11 +43,24 @@ che cambia da un'azienda all'altra sta nel database.
    - Prima di ogni invio: consenso del contatto per quel canale, quota messaggi,
      finestra di 24 ore per il testo libero WhatsApp. Prima di ogni chiamata IA:
      crediti residui; dopo, riga in `ai_calls` e crediti scalati.
+   - Una risposta segue l'ultimo messaggio ricevuto nella conversazione: una mail
+     porta il suo `Message-ID` (`inReplyTo`, oltre a `threadId`), un messaggio social
+     esce sulla stessa piattaforma (Facebook o Instagram).
+   - Tra più collegamenti della stessa categoria contano solo quelli il cui
+     connettore sa davvero eseguire l'azione: un "Webhook in ingresso" non viene
+     mai scelto per leggere o scrivere sul gestionale.
    - Il primo messaggio automatico di una conversazione porta la frase di
      `org_settings.ai_disclosure`, se il testo non dice già che è automatico. I
      modelli WhatsApp approvati partono così come sono.
 4. **Scraping.** Riesegue la ricetta con Playwright, valida le righe, crea un
-   evento solo per le righe nuove (`scrape:<ricetta>:<chiave>`). Se fallisce o non
+   evento solo per le righe nuove (`scrape:<ricetta>:<chiave>`). Le credenziali
+   del sito restano nei segreti del collegamento: la ricetta contiene
+   `{{secrets.username}}` / `{{secrets.password}}`, il worker passa i valori al
+   tracciatore (`secrets`), che li scrive nel browser e li nasconde al modello; gli
+   errori salvati non li riportano mai. Una ricetta appena tracciata viene
+   rieseguita da un browser appena aperto prima di essere salvata (quello del
+   tracciatore ha già fatto l'accesso). Una tracciatura fallita dopo aver speso
+   token è comunque scritta in `ai_calls`. Se fallisce o non
    trova righe valide, l'IA ritraccia il sito, la nuova ricetta viene provata
    subito e salvata come nuova versione. Dopo 3 riparazioni fallite la ricetta
    diventa `broken` e parte un avviso.
@@ -111,12 +127,15 @@ Variabili d'ambiente:
 | `DATABASE_URL` | Postgres del progetto Supabase, con un ruolo che può eseguire le funzioni dei segreti (ruolo di servizio). Obbligatoria. |
 | `DATABASE_SSL` | `false` per un database locale senza TLS. `DATABASE_SSL_VERIFY=true` per verificare il certificato. |
 | `ANTHROPIC_API_KEY` | Senza chiave i blocchi IA falliscono con un messaggio chiaro e lo scraping non si ripara. |
-| `AI_SMART_MODEL`, `AI_FAST_MODEL` | Facoltative: modelli diversi da quelli predefiniti. |
+| `AI_MODEL_SMART`, `AI_MODEL_FAST` | Facoltative: modelli diversi da quelli predefiniti (gli stessi nomi di `packages/ai`). I vecchi `AI_SMART_MODEL` e `AI_FAST_MODEL` sono ancora letti. |
 | `WORKER_CONCURRENCY` | Eventi e lavori in parallelo (predefinito 4). |
 | `OUTBOUND_OVERRIDE_RECIPIENT` | Ambienti non di produzione: ogni invio va a questo destinatario (telefono e/o mail separati da virgola). I canali senza destinatario di prova sono bloccati. |
 | `WHATSAPP_TEST_RECIPIENT` | Come sopra, solo per WhatsApp e senza bloccare gli altri canali. |
 
-Le altre variabili d'ambiente sono passate ai connettori (`ConnectorContext.env`).
+Ai connettori (`ConnectorContext.env`) arrivano solo le variabili che iniziano con
+`GOOGLE_`, `MICROSOFT_`, `META_`, `WAWEBAPI_`, `WEBHOOK_`: mai l'indirizzo del database,
+la chiave IA o le chiavi Supabase. Un connettore che ne richiede altre va aggiunto a
+`connectorEnv` in `src/deps.ts`.
 
 ```
 npm run start -w @ia-connect/worker        # in locale
@@ -128,8 +147,12 @@ Con `SIGTERM` il worker finisce ciò che ha in corso e si ferma; ciò che resta 
 metà riparte alla scadenza del blocco. I log sono righe JSON e non contengono
 segreti né testi dei messaggi.
 
-Test: `npx vitest run apps/worker` (database in memoria, connettori e IA
-finti, nessun invio reale).
+Test: `npx vitest run apps/worker` (database in memoria, nessun invio reale).
+I file `test/integration-*.test.ts` usano i connettori veri di
+`packages/connectors`, il servizio Claude vero di `packages/ai` e il deposito dei
+segreti del worker su un Vault finto; è finta solo la rete (un `fetch` che
+registra le richieste e un client Anthropic con risposte preparate). Gli altri
+test usano connettori e IA finti.
 
 ## Limiti noti
 

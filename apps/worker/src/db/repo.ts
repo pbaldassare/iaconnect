@@ -259,7 +259,8 @@ export async function insertOutboundMessage(
       input.aiGenerated ?? false,
       input.aiModel ?? null,
       input.deliveryStatus,
-      input.externalId,
+      // Providers that return no id must not collide on the unique (channel, external_id) index.
+      input.externalId || null,
       input.flowRunId,
     ],
   );

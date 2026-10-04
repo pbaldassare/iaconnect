@@ -3,7 +3,7 @@ import { getConnector, listConnectors } from "@ia-connect/connectors";
 import type { AiService } from "@ia-connect/core";
 import pg from "pg";
 import { createPgSql } from "./db/sql.ts";
-import { DEFAULT_CONFIG, type Deps, parseOutboundOverride } from "./deps.ts";
+import { DEFAULT_CONFIG, type Deps, connectorEnv, parseOutboundOverride } from "./deps.ts";
 import { StepError } from "./errors.ts";
 import { createJsonLogger } from "./log.ts";
 import { openPlaywrightBrowser } from "./scrape/playwright.ts";
@@ -32,15 +32,16 @@ async function main() {
   pool.on("error", (error) => logger.error("database pool error", { error: error.message }));
   const sql = createPgSql(pool);
 
-  const apiKey = env.ANTHROPIC_API_KEY;
+  const apiKey = env.ANTHROPIC_API_KEY?.trim() || undefined;
+  // Names of packages/ai (AI_MODEL_*); the older AI_*_MODEL spelling is still read.
+  const smartModel = env.AI_MODEL_SMART?.trim() || env.AI_SMART_MODEL?.trim() || undefined;
+  const fastModel = env.AI_MODEL_FAST?.trim() || env.AI_FAST_MODEL?.trim() || undefined;
   const outboundOverride = parseOutboundOverride(env);
   const deps: Deps = {
     sql,
     secrets: createVaultSecretStore(sql),
     connectors: { get: getConnector, list: listConnectors },
-    ai: apiKey
-      ? createClaudeAiService({ apiKey, smartModel: env.AI_SMART_MODEL, fastModel: env.AI_FAST_MODEL })
-      : unavailableAi(),
+    ai: apiKey ? createClaudeAiService({ apiKey, smartModel, fastModel }) : unavailableAi(),
     now: () => new Date(),
     logger,
     fetch: globalThis.fetch,
@@ -48,12 +49,10 @@ async function main() {
       ...DEFAULT_CONFIG,
       maxAttempts: Number(env.WORKER_MAX_ATTEMPTS) || DEFAULT_CONFIG.maxAttempts,
       outboundOverride,
-      env,
+      env: connectorEnv(env),
     },
     openBrowser: () => openPlaywrightBrowser(),
-    tracer: apiKey
-      ? (input) => traceScrapeRecipe({ apiKey, model: env.AI_SMART_MODEL, ...input })
-      : undefined,
+    tracer: apiKey ? (input) => traceScrapeRecipe({ apiKey, model: smartModel, ...input }) : undefined,
   };
 
   const concurrency = Number(env.WORKER_CONCURRENCY) || 4;

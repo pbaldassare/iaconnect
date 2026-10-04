@@ -98,7 +98,12 @@ export function normalizeTwilioWebhook(params: URLSearchParams): NormalizedEvent
       {
         type: "sms.status.updated",
         dedupeKey: `sms_twilio:status:${sid}:${status}`,
-        payload: compact({ messageId: sid, status, error: params.get("ErrorCode") ?? undefined }),
+        payload: compact({
+          messageId: sid,
+          // The platform knows sent, delivered, read, failed: Twilio's "undelivered" is a failure.
+          status: status === "undelivered" ? "failed" : status,
+          error: params.get("ErrorCode") ?? undefined,
+        }),
       },
     ];
   }

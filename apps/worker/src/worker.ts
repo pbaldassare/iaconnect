@@ -97,14 +97,18 @@ export interface WorkerOptions {
  */
 export function startWorker(deps: Deps, options: WorkerOptions): { stop(): Promise<void> } {
   let stopping = false;
-  let wake: (() => void) | undefined;
+  // Every sleeping loop registers its own wake-up, so `stop()` ends all of them at once.
+  const sleepers = new Set<() => void>();
   const sleep = (ms: number) =>
     new Promise<void>((resolve) => {
-      const timer = setTimeout(resolve, ms);
-      wake = () => {
+      if (stopping) return resolve();
+      const wake = () => {
         clearTimeout(timer);
+        sleepers.delete(wake);
         resolve();
       };
+      const timer = setTimeout(wake, ms);
+      sleepers.add(wake);
     });
 
   const slot = async () => {
@@ -143,7 +147,7 @@ export function startWorker(deps: Deps, options: WorkerOptions): { stop(): Promi
   return {
     async stop() {
       stopping = true;
-      wake?.();
+      for (const wake of [...sleepers]) wake();
       await Promise.all(loops);
     },
   };

@@ -80,6 +80,11 @@ export interface ActionDefinition<I = unknown, O = unknown> {
   key: string;
   title: string;
   input: z.ZodType<I>;
+  /**
+   * True when the connector exposes a standard action of its category only to say it cannot
+   * perform it (e.g. `read` on an inbound-only webhook). The engine never picks such a connection.
+   */
+  unsupported?: boolean;
   execute(context: ConnectorContext, input: I): Promise<O>;
 }
 

@@ -13,6 +13,12 @@ export function requireConnector(deps: Deps, connection: ConnectionRow): Connect
   return connector;
 }
 
+/** True when the connection's connector can really perform the action (not a "not supported" stub). */
+export function offersAction(deps: Deps, connection: ConnectionRow, actionKey: string): boolean {
+  const action = deps.connectors.get(connection.connector_type)?.actions[actionKey];
+  return Boolean(action) && action?.unsupported !== true;
+}
+
 /** Context handed to a connector: decrypted secrets, clock, fetch. Secrets stay out of the logs. */
 export async function connectorContext(deps: Deps, connection: ConnectionRow): Promise<ConnectorContext> {
   const secrets = await deps.secrets.read(connection.id);

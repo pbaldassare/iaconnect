@@ -129,6 +129,18 @@ describe("connector registry", () => {
   });
 });
 
+describe("standard actions a connector cannot perform", () => {
+  it("are marked unsupported, so the engine never picks that connection for them", () => {
+    const inbound = getConnector("webhook_inbound")!;
+    expect(inbound.actions.read!.unsupported).toBe(true);
+    expect(inbound.actions.write!.unsupported).toBe(true);
+    const supported = listConnectors().flatMap((connector) =>
+      connector.key === "webhook_inbound" ? [] : Object.values(connector.actions),
+    );
+    expect(supported.filter((action) => action.unsupported)).toEqual([]);
+  });
+});
+
 describe("Deno compatibility of the sources", () => {
   it("uses explicit .ts extensions on every relative import", () => {
     for (const file of sourceFiles(srcDir)) {

@@ -1,4 +1,5 @@
 import { type Channel, ConnectorError } from "@ia-connect/core";
+import { offersAction } from "../connectors.ts";
 import {
   type JobRow,
   type MessageRow,
@@ -68,7 +69,7 @@ export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
       channel,
       null,
       conversation.connection_id,
-      (row) => Boolean(deps.connectors.get(row.connector_type)?.actions[ACTIONS[channel]]),
+      (row) => offersAction(deps, row, ACTIONS[channel]),
     );
     let template: { name: string; language: string; variables: string[] } | undefined;
     if (message.template_id) {
@@ -105,7 +106,7 @@ export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
     await deps.sql.query(
       `update ia_connect.messages set delivery_status = $2, external_id = $3, error = null, meta = meta - 'sending_at'
        where id = $1`,
-      [message.id, sent.status, sent.externalId],
+      [message.id, sent.status, sent.externalId || null],
     );
     await deps.sql.query(
       "update ia_connect.conversations set last_message_at = $2::timestamptz where id = $1",

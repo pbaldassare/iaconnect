@@ -289,7 +289,7 @@ describe("Twilio normalization", () => {
       {
         type: "sms.status.updated",
         dedupeKey: "sms_twilio:status:SM1:undelivered",
-        payload: { messageId: "SM1", status: "undelivered", error: "30003" },
+        payload: { messageId: "SM1", status: "failed", error: "30003" },
       },
     ]);
     expect(normalizeTwilioWebhook(new URLSearchParams({ Foo: "bar" }))).toEqual([]);

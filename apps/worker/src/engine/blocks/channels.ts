@@ -1,4 +1,4 @@
-import { runAction } from "../../connectors.ts";
+import { offersAction, runAction } from "../../connectors.ts";
 import { audit, resolveConnection } from "../../db/repo.ts";
 import { StepError } from "../../errors.ts";
 import { type FlowMessage, previewFromFlow, sendFromFlow } from "../send.ts";
@@ -105,7 +105,7 @@ export const socialPublishPost: Executor<{ connection?: string; text: string; me
       "social",
       params.connection,
       null,
-      (row) => Boolean(ctx.deps.connectors.get(row.connector_type)?.actions.publishPost),
+      (row) => offersAction(ctx.deps, row, "publishPost"),
     );
     const result = await runAction<Record<string, unknown>>(ctx.deps, connection, "publishPost", {
       text: params.text,
