@@ -648,6 +648,8 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
 }
 [hidden] { display: none !important; }
 .nav-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+/* Narrow screens: the nav keeps only "Area riservata"; the demo button is in the hero just below. */
+@media (max-width: 560px) { .nav-actions .btn-primary { display: none; } }
 </style>
 </head>
 <body>
@@ -689,7 +691,7 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
       <a href="#sicurezza">Sicurezza</a>
     </div>
     <div class="nav-actions">
-      <a class="btn btn-ghost btn-small" data-area-riservata hidden>Area riservata</a>
+      <a class="btn btn-ghost btn-small" href="/area-riservata">Area riservata</a>
       <a class="btn btn-primary btn-small" href="#demo"><span class="only-wide">Chiedi una dimostrazione</span><span class="only-narrow">Dimostrazione</span></a>
     </div>
   </nav>
@@ -704,7 +706,7 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
         <p class="lede">IA Connect unisce mail, gestionale e WhatsApp della tua azienda. Quando arriva una richiesta, il cliente riceve risposta, la trattativa si apre e il sollecito parte al momento giusto.</p>
         <div class="cta-row">
           <a class="btn btn-primary" href="#demo">Chiedi una dimostrazione</a>
-          <a class="btn btn-ghost" data-area-riservata hidden>Area riservata</a>
+          <a class="btn btn-ghost" href="/area-riservata">Area riservata</a>
           <a class="btn btn-ghost" href="#come-funziona">Guarda come funziona</a>
         </div>
         <p class="hero-note">Dati in Unione Europea · Il numero WhatsApp resta il tuo</p>
@@ -1320,16 +1322,6 @@ footer { border-top: 1px solid var(--line); padding-block: 36px; }
 //     voto:    5                        (facoltativo, da 1 a 5: senza questo campo le stelle non compaiono)
 //   }
 const RECENSIONI = [];
-
-// Indirizzo dell'applicazione (area riservata: accedi, registrati, area cliente e admin).
-// Finché è vuoto i pulsanti "Area riservata" restano nascosti. Esempio: "https://app.iaconnect.it"
-const AREA_RISERVATA_URL = "";
-if (/^https:\/\//.test(AREA_RISERVATA_URL)) {
-  for (const link of document.querySelectorAll("[data-area-riservata]")) {
-    link.href = AREA_RISERVATA_URL.replace(/\/$/, "") + "/area-riservata";
-    link.hidden = false;
-  }
-}
 
 (function () {
   // Schede dei casi d'uso: un solo punto di tabulazione, frecce per spostarsi

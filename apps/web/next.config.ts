@@ -28,9 +28,10 @@ export function contentSecurityPolicy(options: { supabaseUrl?: string; developme
   return [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${options.development ? " 'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
+    // Google Fonts: the presentation page at "/" loads its typefaces from there.
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: https:",
-    "font-src 'self' data:",
+    "font-src 'self' data: https://fonts.gstatic.com",
     `connect-src ${connect.join(" ")}`,
     "frame-ancestors 'none'",
     "frame-src 'none'",
@@ -62,6 +63,10 @@ const nextConfig: NextConfig = {
   // Monorepo root, so file tracing sees the workspace packages.
   outputFileTracingRoot: path.join(here, "../.."),
   poweredByHeader: false,
+  // The presentation site is a static page copied into public/ by scripts/sync-site.mjs.
+  async rewrites() {
+    return { beforeFiles: [{ source: "/", destination: "/index.html" }], afterFiles: [], fallback: [] };
+  },
   async headers() {
     return [
       {

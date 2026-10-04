@@ -149,7 +149,9 @@ describe("route protection", () => {
   it("protects everything except sign-in and auth callbacks", () => {
     expect(isProtectedPath("/app")).toBe(true);
     expect(isProtectedPath("/admin/aziende")).toBe(true);
-    expect(isProtectedPath("/")).toBe(true);
+    expect(isProtectedPath("/")).toBe(false);
+    expect(isProtectedPath("/assets/photos/hotel-reception.jpg")).toBe(false);
+    expect(isProtectedPath("/assets-private")).toBe(true);
     expect(isProtectedPath("/imposta-password")).toBe(true);
     expect(isProtectedPath("/accedi")).toBe(false);
     expect(isProtectedPath("/auth/callback")).toBe(false);

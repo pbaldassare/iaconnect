@@ -1,6 +1,6 @@
 {
   // Cloudflare Workers configuration for the web app (built with the OpenNext adapter).
-  // Deploy from the repository root with: npm run deploy:app
+  // Used only to bundle the server; the deployment is the Pages project (see ../../wrangler.jsonc).
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "iaconnect-app",
   "main": ".open-next/worker.js",

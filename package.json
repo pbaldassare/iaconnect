@@ -13,9 +13,7 @@
     "format": "biome check --write .",
     "gen:seed": "tsx scripts/gen-seed.ts",
     "gen:types": "tsx scripts/gen-types.ts",
-    "build": "node scripts/build-site.mjs",
-    "build:app": "npm run cf:build -w @ia-connect/web",
-    "deploy:app": "wrangler deploy --config apps/web/wrangler.jsonc"
+    "build": "node scripts/sync-site.mjs && npm run cf:build -w @ia-connect/web && node scripts/build-pages.mjs"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",

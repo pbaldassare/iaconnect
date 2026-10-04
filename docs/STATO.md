@@ -61,7 +61,7 @@ Resta da fare, in ordine:
    `<APP_URL>/auth/callback` ai Redirect URLs. Serve per il link via mail, gli inviti, la conferma
    della registrazione e il recupero della password; l'accesso con password funziona anche senza.
 4. **Registrazione.** Prima di dare a qualcuno l'indirizzo dell'area riservata:
-   - applicare al database la migrazione `supabase/migrations/20261004002000_access_requests.sql`;
+   - la migrazione `20261004002000_access_requests.sql` è già applicata al database;
    - in Supabase → Authentication controllare che le registrazioni via mail siano permesse e che
      la conferma della mail sia attiva (sono impostazioni condivise con "alter ego", come i modelli
      delle mail: la mail di conferma e quella di recupero hanno oggi il suo aspetto e il suo nome);
@@ -81,15 +81,16 @@ Resta da fare, in ordine:
    Dettagli in [moduli/connettori.md](moduli/connettori.md).
 7. **Worker.** Costruire l'immagine con `apps/worker/Dockerfile` su un VPS in UE. Bloccare a livello
    di rete l'uscita verso indirizzi privati (elenco in [moduli/worker.md](moduli/worker.md)).
-8. **Pubblicazione su Cloudflare.** Due progetti distinti sullo stesso repository:
-   - **Sito di presentazione** (Cloudflare Pages): comando di build `npm run build`, cartella di
-     uscita `dist`. La configurazione è in `wrangler.jsonc` nella radice; il nome lì dentro
-     (`iaconnect`) deve coincidere con quello del progetto Pages.
-   - **Applicazione** (Cloudflare Workers, adattatore OpenNext): comando di build `npm run build:app`,
-     comando di deploy `npm run deploy:app`. Le variabili segrete (`SUPABASE_SERVICE_ROLE_KEY`,
-     `ANTHROPIC_API_KEY`, `OAUTH_STATE_SECRET`, `APP_URL` e quelle dei fornitori) vanno aggiunte nel
-     progetto Workers come segreti. In locale la build e la pagina di accesso funzionano nel motore
-     di Workers; le pagine con accesso e il connettore IMAP/SMTP lì non sono stati provati.
+8. **Pubblicazione su Cloudflare.** Un solo progetto Cloudflare Pages collegato al repository
+   pubblica tutto allo stesso indirizzo: il sito di presentazione su `/` e l'area riservata su
+   `/accedi`, `/registrati`, `/app`, `/admin`. Comando di build `npm run build`; la cartella di
+   uscita (`dist`) e le opzioni sono in `wrangler.jsonc` nella radice, dove il nome (`iaconnect`)
+   deve coincidere con quello del progetto Pages. Nel progetto vanno aggiunte come segreti:
+   `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OAUTH_STATE_SECRET`, `APP_URL` (l'indirizzo
+   pubblico) e le variabili dei fornitori. Provato in locale nel motore di Pages: sito, pagine
+   di accesso e registrazione, reindirizzamenti e file statici rispondono. Le pagine dopo
+   l'accesso e il connettore IMAP/SMTP lì non sono stati provati. Il pacchetto del server pesa
+   2,8 MB compressi su un limite di 3 MB del piano gratuito: se cresce serve il piano a pagamento.
 
 **Nota sullo schema esposto.** L'esposizione è fatta con un'impostazione del database, non dalla
 pagina di Supabase, quindi in Project Settings → API l'elenco mostra ancora solo `public` e

@@ -1,7 +1,8 @@
 {
-  // Cloudflare Pages configuration for the presentation site (site/ → dist/).
-  // The web app is a separate Workers project: see apps/web/wrangler.jsonc.
+  // Cloudflare Pages configuration: one project serves the presentation site and the app.
+  // `npm run build` writes dist/ (static files + the server as _worker.js).
   "name": "iaconnect",
   "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-09-01"
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"]
 }

@@ -13,8 +13,16 @@ const ENTRY_PATHS = ["/", LANDING_PATH, "/benvenuto"];
 /** Pages for signed-out visitors only: a signed-in user is sent onward. */
 const SIGNED_OUT_ONLY = [SIGN_IN_PATH, SIGN_UP_PATH];
 
-/** Everything except the sign-in, sign-up, password reset, privacy and auth callback pages needs a session. */
+/** The presentation site, served at the root from `public/` (copied from `site/` at build time). */
+const PRESENTATION_PATHS = ["/", "/index.html"];
+const PRESENTATION_ASSETS = "/assets/";
+
+/**
+ * Everything except the presentation site and the sign-in, sign-up, password reset, privacy
+ * and auth callback pages needs a session.
+ */
 export function isProtectedPath(pathname: string): boolean {
+  if (PRESENTATION_PATHS.includes(pathname) || pathname.startsWith(PRESENTATION_ASSETS)) return false;
   return !PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
