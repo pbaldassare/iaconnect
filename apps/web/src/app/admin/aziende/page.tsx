@@ -7,6 +7,7 @@ import { Input, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { Table, Td, Th } from "@/components/ui/table";
+import { pendingAccessRequestCount } from "@/lib/access";
 import { errorMessage } from "@/lib/action";
 import { formatDate } from "@/lib/format";
 import { organizationStatus, sectorLabel } from "@/lib/labels";
@@ -49,6 +50,7 @@ export default async function OrganizationsPage({
   const resellerNames = new Map((resellers.data ?? []).map((r) => [r.id, r.name]));
   const showReseller = session.isPlatformAdmin || session.resellerIds.length > 1;
   const filtered = q !== "" || status !== "";
+  const pendingRequests = session.isPlatformAdmin ? await pendingAccessRequestCount(supabase) : 0;
 
   return (
     <>
@@ -61,6 +63,22 @@ export default async function OrganizationsPage({
           </ButtonLink>
         }
       />
+      {pendingRequests > 0 ? (
+        <Notice
+          tone="warning"
+          title={
+            pendingRequests === 1
+              ? "1 richiesta di accesso in attesa"
+              : `${pendingRequests} richieste di accesso in attesa`
+          }
+          className="mb-4"
+        >
+          Qualcuno si è registrato e aspetta l'attivazione della propria azienda.{" "}
+          <Link href="/admin/richieste" className="font-semibold">
+            Vedi le richieste
+          </Link>
+        </Notice>
+      ) : null}
       {deleted ? (
         <Notice tone="ok" announce="status" className="mb-4">
           L'azienda «{deleted}» e tutti i suoi dati sono stati eliminati.

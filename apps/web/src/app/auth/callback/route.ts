@@ -1,3 +1,4 @@
+import { completeSignIn } from "@/lib/access";
 import { safeNextPath } from "@/lib/routes";
 import { createClient } from "@/lib/supabase/server";
 import { appUrl } from "@/lib/url";
@@ -7,10 +8,12 @@ import { type NextRequest, NextResponse } from "next/server";
 const OTP_TYPES: readonly string[] = ["signup", "invite", "magiclink", "recovery", "email_change", "email"];
 
 /**
- * Landing point of the links sent by mail (magic link, invitation).
- * Handles the PKCE `code`, the `token_hash` variant, and hands links that
- * carry the session in the URL fragment (invitations) to /auth/conferma.
- * After sign-in, pending invitations become memberships.
+ * Landing point of the links sent by mail (magic link, invitation, sign-up
+ * confirmation, password reset). Handles the PKCE `code`, the `token_hash`
+ * variant, and hands links that carry the session in the URL fragment
+ * (invitations) to /auth/conferma. After sign-in, pending invitations become
+ * memberships, the registration data becomes an access request, and the user
+ * is sent where they belong (lib/access.ts).
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -36,8 +39,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(`${base}/accedi?errore=link`);
   }
 
-  const { error: inviteError } = await supabase.rpc("accept_invitations");
-  if (inviteError) console.error("[auth/callback] accept_invitations", inviteError.code, inviteError.message);
-  const destination = type === "invite" || type === "recovery" ? "/imposta-password" : next;
+  const wanted = type === "invite" || type === "recovery" ? "/imposta-password" : next;
+  const destination = (await completeSignIn(supabase, wanted)) ?? "/accedi?errore=link";
   return NextResponse.redirect(`${base}${destination}`);
 }

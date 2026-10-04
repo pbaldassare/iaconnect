@@ -38,8 +38,8 @@ export default async function SetPasswordPage() {
         <SubmitButton>Salva la password</SubmitButton>
       </ActionForm>
       <p className="mt-4 text-sm">
-        <Link href="/app" className="text-muted underline hover:text-ink">
-          Non ora, vai all'app
+        <Link href="/area-riservata" className="text-muted underline hover:text-ink">
+          Non ora, continua
         </Link>
       </p>
     </PlainPage>

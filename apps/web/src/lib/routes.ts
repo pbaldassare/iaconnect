@@ -3,9 +3,17 @@
 export const SIGN_IN_PATH = "/accedi";
 export const DEFAULT_AFTER_SIGN_IN = "/app";
 
-const PUBLIC_PREFIXES = ["/accedi", "/auth"];
+export const SIGN_UP_PATH = "/registrati";
+/** "Take me where I belong": decides the page from roles and access request. */
+export const LANDING_PATH = "/area-riservata";
 
-/** Everything except the sign-in and auth callback pages needs a session. */
+const PUBLIC_PREFIXES = ["/accedi", "/auth", "/registrati", "/password-dimenticata", "/privacy"];
+/** Entry points with no page of their own: not worth remembering as `next`. */
+const ENTRY_PATHS = ["/", LANDING_PATH, "/benvenuto"];
+/** Pages for signed-out visitors only: a signed-in user is sent onward. */
+const SIGNED_OUT_ONLY = [SIGN_IN_PATH, SIGN_UP_PATH];
+
+/** Everything except the sign-in, sign-up, password reset, privacy and auth callback pages needs a session. */
 export function isProtectedPath(pathname: string): boolean {
   return !PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
@@ -16,7 +24,24 @@ export function signInRedirect(pathname: string, search = ""): { pathname: strin
   const next = safeNextPath(wanted);
   return {
     pathname: SIGN_IN_PATH,
-    search: next === DEFAULT_AFTER_SIGN_IN || pathname === "/" ? "" : `?next=${encodeURIComponent(next)}`,
+    search:
+      next === DEFAULT_AFTER_SIGN_IN || ENTRY_PATHS.includes(pathname)
+        ? ""
+        : `?next=${encodeURIComponent(next)}`,
+  };
+}
+
+/**
+ * Where a signed-in user who opens /accedi or /registrati goes instead: the landing route,
+ * which keeps the `next` they came with. Null for every other page.
+ */
+export function signedInRedirect(pathname: string, search = ""): { pathname: string; search: string } | null {
+  if (!SIGNED_OUT_ONLY.includes(pathname)) return null;
+  const next = new URLSearchParams(search).get("next");
+  const safe = safeNextPath(next);
+  return {
+    pathname: LANDING_PATH,
+    search: next && safe !== DEFAULT_AFTER_SIGN_IN ? `?next=${encodeURIComponent(safe)}` : "",
   };
 }
 
@@ -28,8 +53,9 @@ export function safeNextPath(value: string | null | undefined): string {
   if (!value) return DEFAULT_AFTER_SIGN_IN;
   if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return DEFAULT_AFTER_SIGN_IN;
   if ([...value].some((char) => char.charCodeAt(0) < 0x20)) return DEFAULT_AFTER_SIGN_IN;
-  if (value === SIGN_IN_PATH || value.startsWith(`${SIGN_IN_PATH}?`) || value.startsWith("/auth/")) {
-    return DEFAULT_AFTER_SIGN_IN;
-  }
+  if (value.startsWith("/auth/")) return DEFAULT_AFTER_SIGN_IN;
+  // Never back to a page that only makes sense signed out (it would bounce forever).
+  const path = value.split(/[?#]/)[0];
+  if (path === SIGN_IN_PATH || path === SIGN_UP_PATH) return DEFAULT_AFTER_SIGN_IN;
   return value;
 }

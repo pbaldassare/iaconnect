@@ -7,6 +7,8 @@ export interface NavItem {
   icon: IconName;
   /** Match only the exact path (used by "Inizio", whose href is a prefix of the others). */
   exact?: boolean;
+  /** Things waiting behind this link (pending access requests); shown when greater than zero. */
+  badge?: number;
 }
 
 /** Customer area. Every member sees every section; pages hide write actions when `canManage` is false. */
@@ -26,8 +28,11 @@ interface AdminNavItem extends NavItem {
   platformOnly: boolean;
 }
 
+export const ACCESS_REQUESTS_PATH = "/admin/richieste";
+
 const ADMIN_NAV: readonly AdminNavItem[] = [
   { href: "/admin/aziende", label: "Aziende", icon: "building", platformOnly: false },
+  { href: ACCESS_REQUESTS_PATH, label: "Richieste", icon: "key", platformOnly: true },
   { href: "/admin/catalogo", label: "Catalogo", icon: "grid", platformOnly: true },
   { href: "/admin/piani", label: "Piani", icon: "tag", platformOnly: true },
   { href: "/admin/rivenditori", label: "Rivenditori", icon: "people", platformOnly: true },
@@ -50,6 +55,13 @@ export function adminNav(roles: AdminRoles): NavItem[] {
   if (!isStaff(roles)) return [];
   return ADMIN_NAV.filter((item) => roles.isPlatformAdmin || !item.platformOnly).map(
     ({ platformOnly: _platformOnly, ...item }) => item,
+  );
+}
+
+/** Puts the number of pending access requests on the «Richieste» item. */
+export function withPendingRequests(items: readonly NavItem[], pending: number): NavItem[] {
+  return items.map((item) =>
+    item.href === ACCESS_REQUESTS_PATH && pending > 0 ? { ...item, badge: pending } : item,
   );
 }
 

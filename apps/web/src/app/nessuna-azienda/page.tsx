@@ -2,6 +2,8 @@ import { signOut, switchOrganization } from "@/components/shell/actions";
 import { PlainPage } from "@/components/shell/plain-page";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/form-message";
+import { resolveLanding } from "@/lib/access";
+import { COMPLETE_REGISTRATION_PATH, WAITING_PATH } from "@/lib/landing-route";
 import { firstParam } from "@/lib/pagination";
 import { getOrgContext } from "@/lib/session";
 import type { Metadata } from "next";
@@ -20,6 +22,12 @@ export default async function NoOrganizationPage({
     // An invitation may have arrived after sign-in: accept it now instead of asking to sign in again.
     const { data: accepted } = await supabase.rpc("accept_invitations");
     if (accepted && accepted > 0) redirect("/app");
+    // No organization because the person is still waiting for one, or never asked: those
+    // cases have their own pages. What stays here: suspended, or access taken away.
+    const landing = await resolveLanding(supabase);
+    if (landing && (landing.path === WAITING_PATH || landing.path === COMPLETE_REGISTRATION_PATH)) {
+      redirect(landing.path);
+    }
   }
   const usable = organizations.filter((o) => o.status === "active");
 
@@ -36,7 +44,7 @@ export default async function NoOrganizationPage({
         <Notice tone="neutral" className="mb-4">
           Sei entrato come <span className="font-mono text-[13px]">{session.user.email}</span>. Se sei stato
           invitato con un altro indirizzo, esci e rientra con quello. Altrimenti chiedi un invito al titolare
-          della tua azienda.
+          della tua azienda, oppure scrivi a chi ti segue in IA Connect.
         </Notice>
       ) : null}
       {usable.length > 0 ? (

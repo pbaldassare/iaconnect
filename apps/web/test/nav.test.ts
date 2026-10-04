@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { CUSTOMER_NAV, adminNav, canAccessAdminPath, isNavItemActive, isStaff } from "../src/lib/nav";
-import { isProtectedPath, safeNextPath, signInRedirect } from "../src/lib/routes";
+import {
+  CUSTOMER_NAV,
+  adminNav,
+  canAccessAdminPath,
+  isNavItemActive,
+  isStaff,
+  withPendingRequests,
+} from "../src/lib/nav";
+import { isProtectedPath, safeNextPath, signInRedirect, signedInRedirect } from "../src/lib/routes";
 
 const platform = { isPlatformAdmin: true, resellerIds: [] };
 const reseller = { isPlatformAdmin: false, resellerIds: ["r1"] };
@@ -35,6 +42,7 @@ describe("admin navigation", () => {
   it("gives platform admins every page", () => {
     expect(adminNav(platform).map((i) => i.label)).toEqual([
       "Aziende",
+      "Richieste",
       "Catalogo",
       "Piani",
       "Rivenditori",
@@ -45,6 +53,15 @@ describe("admin navigation", () => {
 
   it("gives reseller admins only their organizations and the audit log", () => {
     expect(adminNav(reseller).map((i) => i.label)).toEqual(["Aziende", "Registro"]);
+  });
+
+  it("shows the pending access requests on «Richieste» only, and only when there are some", () => {
+    const items = withPendingRequests(adminNav(platform), 3);
+    expect(items.filter((i) => i.badge !== undefined).map((i) => [i.label, i.badge])).toEqual([
+      ["Richieste", 3],
+    ]);
+    expect(withPendingRequests(adminNav(platform), 0).some((i) => i.badge !== undefined)).toBe(false);
+    expect(withPendingRequests(adminNav(reseller), 3).some((i) => i.badge !== undefined)).toBe(false);
   });
 
   it("gives customers nothing", () => {
@@ -71,6 +88,7 @@ describe("canAccessAdminPath", () => {
     expect(canAccessAdminPath(reseller, "/admin/aziende")).toBe(true);
     expect(canAccessAdminPath(reseller, "/admin/aziende/abc")).toBe(true);
     expect(canAccessAdminPath(reseller, "/admin/registro")).toBe(true);
+    expect(canAccessAdminPath(reseller, "/admin/richieste")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/catalogo")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/piani")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/rivenditori")).toBe(false);
@@ -85,6 +103,49 @@ describe("canAccessAdminPath", () => {
 });
 
 describe("route protection", () => {
+  it("leaves the account pages open to signed-out visitors, and nothing that looks like them", () => {
+    for (const path of ["/registrati", "/password-dimenticata", "/privacy"]) {
+      expect(isProtectedPath(path), path).toBe(false);
+    }
+    for (const path of [
+      "/area-riservata",
+      "/benvenuto",
+      "/in-attesa",
+      "/completa-registrazione",
+      "/admin/richieste",
+      "/registrati-finto",
+      "/privacy-interna",
+    ]) {
+      expect(isProtectedPath(path), path).toBe(true);
+    }
+  });
+
+  it("sends a signed-out visitor of the entry points to a plain /accedi", () => {
+    expect(signInRedirect("/area-riservata")).toEqual({ pathname: "/accedi", search: "" });
+    expect(signInRedirect("/benvenuto")).toEqual({ pathname: "/accedi", search: "" });
+    expect(signInRedirect("/in-attesa")).toEqual({
+      pathname: "/accedi",
+      search: `?next=${encodeURIComponent("/in-attesa")}`,
+    });
+  });
+
+  it("sends a signed-in visitor of /accedi and /registrati onward, keeping a safe next", () => {
+    expect(signedInRedirect("/accedi")).toEqual({ pathname: "/area-riservata", search: "" });
+    expect(signedInRedirect("/registrati")).toEqual({ pathname: "/area-riservata", search: "" });
+    expect(signedInRedirect("/accedi", "?next=%2Fapp%2Finbox")).toEqual({
+      pathname: "/area-riservata",
+      search: `?next=${encodeURIComponent("/app/inbox")}`,
+    });
+    expect(signedInRedirect("/accedi", "?next=https%3A%2F%2Fevil.example")).toEqual({
+      pathname: "/area-riservata",
+      search: "",
+    });
+    expect(signedInRedirect("/password-dimenticata")).toBeNull();
+    expect(signedInRedirect("/privacy")).toBeNull();
+    expect(signedInRedirect("/app")).toBeNull();
+    expect(signedInRedirect("/auth/callback")).toBeNull();
+  });
+
   it("protects everything except sign-in and auth callbacks", () => {
     expect(isProtectedPath("/app")).toBe(true);
     expect(isProtectedPath("/admin/aziende")).toBe(true);
@@ -114,6 +175,10 @@ describe("route protection", () => {
     expect(safeNextPath("/\\evil.example")).toBe("/app");
     expect(safeNextPath("javascript:alert(1)")).toBe("/app");
     expect(safeNextPath("/accedi")).toBe("/app");
+    expect(safeNextPath("/accedi?next=/accedi")).toBe("/app");
+    expect(safeNextPath("/registrati")).toBe("/app");
+    expect(safeNextPath("/registrati?x=1")).toBe("/app");
+    expect(safeNextPath("/registrati-e-altro")).toBe("/registrati-e-altro");
     expect(safeNextPath("/auth/callback")).toBe("/app");
   });
 });
