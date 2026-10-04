@@ -69,12 +69,17 @@ Resta da fare, in ordine:
    - prima dell'apertura al pubblico: attivare un CAPTCHA in Supabase Auth e aggiungerlo al modulo
      (non fatto), e decidere il passaggio a un progetto Supabase dedicato.
    Nessuna mail avvisa di una nuova richiesta: va guardato il contatore nell'area admin.
-5. **Webhook.** Pubblicare la edge function e provarla (non è mai stata eseguita; il suo codice si
-   compila in un unico file senza moduli Node):
-   ```bash
-   npx supabase login
-   npx supabase functions deploy webhook --project-ref ywsolxklcyctrezngclz
-   ```
+5. **Webhook.** Fatto il 2026-10-04: la edge function `webhook` è pubblicata
+   (`https://ywsolxklcyctrezngclz.supabase.co/functions/v1/webhook`) e provata dal vivo con un
+   collegamento di prova poi rimosso: richiesta firmata accettata, firma sbagliata rifiutata,
+   tipo di evento riservato rifiutato, indirizzo sconosciuto 404. È stata pubblicata con il
+   collegamento MCP di Supabase: il file d'ingresso importa il codice dei connettori dal
+   repository GitHub a un commit fisso (`0af1b6c`). Dopo ogni modifica a `packages/connectors`
+   o `packages/core` va ripubblicata, aggiornando il commit oppure con
+   `npx supabase functions deploy webhook --project-ref ywsolxklcyctrezngclz`. Per ripubblicarla
+   dal commit il repository deve essere pubblico. Restano da impostare tra i segreti della
+   funzione `META_APP_SECRET`, `META_WEBHOOK_VERIFY_TOKEN` e `WEBHOOK_PUBLIC_URL` quando si
+   collegano Meta e Twilio.
 6. **App dei fornitori.** Google (Gmail, Calendar), Microsoft Entra, Meta (WhatsApp, pagine, Instagram):
    creare le app, registrare `<APP_URL>/api/oauth/<connettore>/callback`, compilare le variabili relative.
    Nell'app Meta puntare WhatsApp a `…/webhook/p/whatsapp_meta` e le pagine a `…/webhook/p/meta_social`.
