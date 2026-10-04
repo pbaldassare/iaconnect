@@ -1,11 +1,19 @@
 import { errorMessage } from "@/lib/action";
 import { writeAudit } from "@/lib/audit";
+import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { slugify } from "@/lib/parse";
 import { actorOf, requireOrgManager } from "@/lib/session";
 
 /** Everything the organization owns as JSON (managers only; the RPC checks it again). Logged. */
 export async function GET() {
   const context = await requireOrgManager();
+  // Downloads stay closed in the demo (the middleware already sends demo visitors back).
+  if (context.demo) {
+    return new Response(DEMO_READ_ONLY_MESSAGE, {
+      status: 403,
+      headers: { "content-type": "text/plain; charset=utf-8" },
+    });
+  }
   const { supabase, org } = context;
   const { data, error } = await supabase.rpc("export_organization", { p_org: org.organization.id });
   if (error) {

@@ -107,3 +107,13 @@ export function formatRelative(value: DateInput, now: Date = new Date()): string
 export function shortId(id: string | null | undefined): string {
   return id ? id.slice(0, 8) : EMPTY;
 }
+
+/**
+ * A stored phone number (`+393331234567`) the way people read it: `+39 333 123 4567`.
+ * Only Italian numbers are grouped; anything else is returned as it is.
+ */
+export function formatPhone(value: string | null | undefined): string {
+  if (!value) return EMPTY;
+  const match = /^\+39(\d{3})(\d{3})(\d{3,4})$/.exec(value.replace(/\s+/g, ""));
+  return match ? `+39 ${match[1]} ${match[2]} ${match[3]}` : value;
+}

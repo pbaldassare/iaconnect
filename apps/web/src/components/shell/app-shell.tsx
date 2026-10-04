@@ -1,6 +1,7 @@
 import { Icon } from "@/components/ui/icons";
 import type { Brand } from "@/lib/brand";
 import type { NavItem } from "@/lib/nav";
+import { DEMO_EXIT_PATH } from "@/lib/routes";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { signOut } from "./actions";
@@ -22,6 +23,7 @@ export function AppShell({
   headerExtra,
   banner,
   crossLink,
+  demo = false,
   children,
 }: {
   area: "customer" | "admin";
@@ -35,6 +37,8 @@ export function AppShell({
   banner?: ReactNode;
   /** Link to the other area, when the user may use both. */
   crossLink?: { href: string; label: string };
+  /** Public demo: no account links, "Esci" leaves the demo. */
+  demo?: boolean;
   children: ReactNode;
 }) {
   const name = brand.name ?? "IA Connect";
@@ -88,16 +92,26 @@ export function AppShell({
               </Link>
             ) : null}
             <ThemeToggle />
-            <Link href="/imposta-password" className={footerLink}>
-              <Icon name="key" />
-              Cambia password
-            </Link>
-            <form action={signOut}>
-              <button type="submit" className={footerLink}>
+            {demo ? (
+              // A plain anchor: the address changes a cookie and must not be prefetched.
+              <a href={DEMO_EXIT_PATH} className={footerLink}>
                 <Icon name="logout" />
-                Esci
-              </button>
-            </form>
+                Esci dalla demo
+              </a>
+            ) : (
+              <>
+                <Link href="/imposta-password" className={footerLink}>
+                  <Icon name="key" />
+                  Cambia password
+                </Link>
+                <form action={signOut}>
+                  <button type="submit" className={footerLink}>
+                    <Icon name="logout" />
+                    Esci
+                  </button>
+                </form>
+              </>
+            )}
             <p className="truncate px-2.5 pt-1 font-mono text-[11.5px] text-muted" title={userEmail}>
               {userEmail}
             </p>

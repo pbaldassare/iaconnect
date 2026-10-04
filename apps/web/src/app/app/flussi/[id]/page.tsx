@@ -13,8 +13,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Table, Td, Th } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { errorMessage } from "@/lib/action";
-import { eventTitle } from "@/lib/flows/describe";
+import { blockTitle, eventTitle } from "@/lib/flows/describe";
 import { parseRequirements, planTemplateInstall } from "@/lib/flows/install";
+import { stepTitles } from "@/lib/flows/runs";
 import { type FlowEnvironment, loadFlowEnvironment, loadFlowPermissions } from "@/lib/flows/server";
 import {
   INBOUND_TEST_EVENT_NOTE,
@@ -488,7 +489,7 @@ async function SimulationTab({
 }) {
   const { supabase, org } = context;
   const orgId = org.organization.id;
-  const [runs, jobs] = await Promise.all([
+  const [runs, jobs, stages] = await Promise.all([
     supabase
       .from("flow_runs")
       .select("id, status, event_id, error, started_at, finished_at, contact_id")
@@ -505,7 +506,9 @@ async function SimulationTab({
       .contains("payload", { flow_version_id: version.id })
       .order("created_at", { ascending: false })
       .limit(3),
+    supabase.from("deal_stages").select("key, name").eq("organization_id", orgId),
   ]);
+  const stageNames = Object.fromEntries((stages.data ?? []).map((stage) => [stage.key, stage.name]));
   const runRows = runs.data ?? [];
   const runIds = runRows.map((run) => run.id);
   const eventIds = runRows.flatMap((run) => (run.event_id ? [run.event_id] : []));
@@ -592,7 +595,7 @@ async function SimulationTab({
               {run.error}
             </Notice>
           ) : null}
-          <RunSteps steps={stepsByRun.get(run.id) ?? []} />
+          <RunSteps steps={stepsByRun.get(run.id) ?? []} stageNames={stageNames} />
         </Card>
       ))}
     </div>
@@ -724,7 +727,7 @@ async function RunsTab({ context, flow }: { context: OrgContext; flow: Row<"flow
   const { data: runs, error } = await supabase
     .from("flow_runs")
     .select(
-      "id, status, started_at, finished_at, contact_id, current_step_id, error, waiting_for, wait_until",
+      "id, status, started_at, finished_at, contact_id, current_step_id, error, waiting_for, wait_until, flow_version_id",
     )
     .eq("organization_id", orgId)
     .eq("flow_id", flow.id)
@@ -741,6 +744,22 @@ async function RunsTab({ context, flow }: { context: OrgContext; flow: Row<"flow
         .in("id", contactIds)
     : { data: [] };
   const names = new Map((contacts ?? []).map((contact) => [contact.id, contact.full_name]));
+  // The step a run is standing on, by its title in the version the run uses (not the technical id).
+  const waitingVersionIds = [
+    ...new Set(
+      rows.filter((run) => !run.finished_at && run.current_step_id).map((run) => run.flow_version_id),
+    ),
+  ];
+  const { data: runVersions } = waitingVersionIds.length
+    ? await supabase
+        .from("flow_versions")
+        .select("id, definition")
+        .eq("organization_id", orgId)
+        .in("id", waitingVersionIds)
+    : { data: [] };
+  const titlesByVersion = new Map(
+    (runVersions ?? []).map((item) => [item.id, stepTitles(item.definition, blockTitle)]),
+  );
   const waiting: Record<string, string> = {
     reply: "una risposta",
     timer: "una scadenza",
@@ -798,8 +817,11 @@ async function RunsTab({ context, flow }: { context: OrgContext; flow: Row<"flow
                   ) : null}
                 </Td>
                 <Td>{run.contact_id ? names.get(run.contact_id) || shortId(run.contact_id) : "—"}</Td>
-                <Td mono muted>
-                  {run.finished_at ? "—" : (run.current_step_id ?? "—")}
+                <Td muted>
+                  {run.finished_at || !run.current_step_id
+                    ? "—"
+                    : (titlesByVersion.get(run.flow_version_id)?.get(run.current_step_id) ??
+                      run.current_step_id)}
                 </Td>
                 <Td mono muted>
                   {run.finished_at ? formatDateTime(run.finished_at) : "—"}

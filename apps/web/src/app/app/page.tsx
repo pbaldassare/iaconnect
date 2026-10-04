@@ -93,7 +93,7 @@ export default async function HomePage() {
         </Notice>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {onboarding ? (
           <Card className="lg:col-span-2" aria-labelledby="per-cominciare">
             <CardHeader

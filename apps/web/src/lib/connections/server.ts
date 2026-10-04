@@ -8,6 +8,7 @@ import {
   webhookBaseUrl,
 } from "@/lib/connections/catalog";
 import { oauthStateSecretFrom } from "@/lib/connections/oauth-state";
+import { assertNotDemo } from "@/lib/demo/server";
 import { publicEnv } from "@/lib/env";
 import type { OrgContext } from "@/lib/session";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -86,6 +87,7 @@ export async function writeConnection(
   service: Db,
   input: { actorId: string; organizationId: string; connectionId: string | null; values: ConnectionValues },
 ): Promise<Row<"connections">> {
+  await assertNotDemo();
   const { data, error } = await service.rpc("save_connection", {
     p_actor: input.actorId,
     p_organization: input.organizationId,
@@ -126,6 +128,7 @@ export async function readConnectionSecrets(
   service: Db,
   connectionId: string,
 ): Promise<Record<string, unknown>> {
+  await assertNotDemo();
   const { data, error } = await service.rpc("read_connection_secret", { p_connection: connectionId });
   if (error) throw error;
   return asRecord(data);
@@ -136,6 +139,7 @@ export async function storeConnectionSecrets(
   connectionId: string,
   secrets: Record<string, unknown>,
 ): Promise<void> {
+  await assertNotDemo();
   const { error } = await service.rpc("store_connection_secret", {
     p_connection: connectionId,
     p_secret: secrets as Json,
@@ -209,6 +213,7 @@ export async function saveConnection(
   },
 ): Promise<SavedConnection> {
   const { connector, result } = input;
+  await assertNotDemo();
   const service = createServiceClient();
   const orgId = context.org.organization.id;
   const actorId = context.session.user.id;

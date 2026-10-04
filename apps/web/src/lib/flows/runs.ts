@@ -96,3 +96,20 @@ export function sanitizeHistory(
   }
   return out.slice(-limits.maxTurns);
 }
+
+/**
+ * Step id → "3. Invia WhatsApp da modello", from a stored flow definition: what the pages
+ * show instead of the technical id of the step a run is standing on. Unknown shapes give
+ * an empty map (the caller falls back to the id).
+ */
+export function stepTitles(definition: unknown, blockTitle: (block: string) => string): Map<string, string> {
+  const out = new Map<string, string>();
+  const steps = (definition as { steps?: unknown } | null)?.steps;
+  if (!Array.isArray(steps)) return out;
+  steps.forEach((step, index) => {
+    const { id, block } = (step ?? {}) as { id?: unknown; block?: unknown };
+    if (typeof id === "string" && typeof block === "string")
+      out.set(id, `${index + 1}. ${blockTitle(block)}`);
+  });
+  return out;
+}

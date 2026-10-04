@@ -88,7 +88,9 @@ Resta da fare, in ordine:
    di rete l'uscita verso indirizzi privati (elenco in [moduli/worker.md](moduli/worker.md)).
 8. **Pubblicazione su Cloudflare.** Un solo progetto Cloudflare Pages collegato al repository
    pubblica tutto allo stesso indirizzo: il sito di presentazione su `/` e l'area riservata su
-   `/accedi`, `/registrati`, `/app`, `/admin`. Comando di build `npm run build`; la cartella di
+   `/accedi`, `/registrati`, `/app`, `/admin`. In più `/demo` apre l'area cliente in sola lettura con
+   dati di esempio, senza account e senza toccare il database (vedi «Demo» in
+   [moduli/web.md](moduli/web.md)). Comando di build `npm run build`; la cartella di
    uscita (`dist`) e le opzioni sono in `wrangler.jsonc` nella radice, dove il nome (`iaconnect`)
    deve coincidere con quello del progetto Pages. Nel progetto vanno aggiunte come segreti:
    `SUPABASE_SERVICE_ROLE_KEY`, `ANTHROPIC_API_KEY`, `OAUTH_STATE_SECRET`, `APP_URL` (l'indirizzo

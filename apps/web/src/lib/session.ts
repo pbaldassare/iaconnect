@@ -1,4 +1,6 @@
 import "server-only";
+import { demoOrgContext } from "@/lib/demo/context";
+import { isDemoRequest } from "@/lib/demo/server";
 import {
   ORG_COOKIE,
   type OrgMode,
@@ -53,13 +55,23 @@ export interface OrgContext {
   org: CurrentOrg;
   /** Organizations the user is a member of (for the switcher), sorted by name. */
   organizations: Row<"organizations">[];
+  /**
+   * True for a visitor of the public demo: `supabase` is the in-memory client of
+   * lib/demo (read-only fixtures), the user and the organization are made up.
+   */
+  demo: boolean;
 }
 
 const UNAVAILABLE_PATH = "/non-disponibile";
 const NO_ORG_PATH = "/nessuna-azienda";
 
-/** Signed-in user with roles, or null. Cached per request. */
+/**
+ * Signed-in user with roles, or null. Cached per request.
+ * A demo visitor is nobody here: requireUser(), requireStaff(), requirePlatformAdmin() and
+ * requireStaffForOrg() all start from this function, so the demo cookie can never satisfy them.
+ */
 export const getSession = cache(async (): Promise<Session | null> => {
+  if (await isDemoRequest()) return null;
   const supabase = await createClient();
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return null;
@@ -139,7 +151,10 @@ export const getOrgContext = cache(
     session: Session;
     org: CurrentOrg | null;
     organizations: Row<"organizations">[];
+    demo: boolean;
   }> => {
+    // Demo first: no session is looked up and no real client is created.
+    if (await isDemoRequest()) return demoOrgContext();
     const session = await requireUser();
     const supabase = await createClient();
     const orgMemberships = session.memberships.filter((m) => m.organization_id !== null);
@@ -183,7 +198,7 @@ export const getOrgContext = cache(
       memberOrgIds: organizations.map((o) => o.id),
       supportOrgId: supportSession?.organization_id ?? null,
     });
-    if (!selection) return { supabase, session, org: null, organizations };
+    if (!selection) return { supabase, session, org: null, organizations, demo: false };
 
     if (selection.mode === "support") {
       const { data: organization } = await supabase
@@ -192,12 +207,13 @@ export const getOrgContext = cache(
         .eq("id", selection.orgId)
         .maybeSingle();
       if (!organization || !isStaffForOrg(session, organization)) {
-        return { supabase, session, org: null, organizations };
+        return { supabase, session, org: null, organizations, demo: false };
       }
       return {
         supabase,
         session,
         organizations,
+        demo: false,
         org: { organization, mode: "support", membership: null, canManage: true, supportSession },
       };
     }
@@ -208,6 +224,7 @@ export const getOrgContext = cache(
       supabase,
       session,
       organizations,
+      demo: false,
       org: {
         organization,
         mode: "member",
@@ -225,12 +242,12 @@ export const getOrgContext = cache(
  * organization, and to /nessuna-azienda when there is none or it is suspended.
  */
 export async function requireOrg(): Promise<OrgContext> {
-  const { supabase, session, org, organizations } = await getOrgContext();
+  const { supabase, session, org, organizations, demo } = await getOrgContext();
   if (!org) redirect(session.isStaff ? "/admin" : NO_ORG_PATH);
   if (org.mode === "member" && org.organization.status === "suspended") {
     redirect(`${NO_ORG_PATH}?motivo=sospesa`);
   }
-  return { supabase, session, org, organizations };
+  return { supabase, session, org, organizations, demo };
 }
 
 /**

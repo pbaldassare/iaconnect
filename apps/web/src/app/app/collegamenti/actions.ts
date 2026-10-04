@@ -12,6 +12,7 @@ import {
   saveConnection,
   writeConnection,
 } from "@/lib/connections/server";
+import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { verifyConnectionJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
@@ -56,6 +57,7 @@ export async function connectWithForm(
   formData: FormData,
 ): Promise<ConnectState> {
   const context = await requireOrgManager();
+  if (context.demo) return { status: "error", message: DEMO_READ_ONLY_MESSAGE };
   const connector = getConnector(connectorKey);
   if (!connector || connector.connectMode === "oauth") {
     return { status: "error", message: "Questo tipo di collegamento non si crea da qui." };
@@ -150,6 +152,7 @@ export async function verifyConnectionNow(
   _formData: FormData,
 ): Promise<ActionResult> {
   const context = await requireOrgManager();
+  if (context.demo) return fail(DEMO_READ_ONLY_MESSAGE);
   const connection = await loadConnection(context, connectionId);
   if (!connection) return fail("Collegamento non trovato.");
   if (connection.status === "disconnected") return fail("Il collegamento è scollegato: ricollegalo prima.");
@@ -179,6 +182,7 @@ export async function checkConnectionNow(
   _formData: FormData,
 ): Promise<ActionResult> {
   const context = await requireOrgManager();
+  if (context.demo) return fail(DEMO_READ_ONLY_MESSAGE);
   const connection = await loadConnection(context, connectionId);
   if (!connection) return fail("Collegamento non trovato.");
   const connector = getConnector(connection.connector_type);
@@ -215,6 +219,7 @@ export async function disconnectConnection(
   _formData: FormData,
 ): Promise<ActionResult> {
   const context = await requireOrgManager();
+  if (context.demo) return fail(DEMO_READ_ONLY_MESSAGE);
   const connection = await loadConnection(context, connectionId);
   if (!connection) return fail("Collegamento non trovato.");
   const connector = getConnector(connection.connector_type);
@@ -255,6 +260,7 @@ export async function registerWebhookAgain(
   _formData: FormData,
 ): Promise<ActionResult> {
   const context = await requireOrgManager();
+  if (context.demo) return fail(DEMO_READ_ONLY_MESSAGE);
   const connection = await loadConnection(context, connectionId);
   if (!connection) return fail("Collegamento non trovato.");
   const connector = getConnector(connection.connector_type);

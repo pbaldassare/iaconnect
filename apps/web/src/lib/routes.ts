@@ -7,7 +7,25 @@ export const SIGN_UP_PATH = "/registrati";
 /** "Take me where I belong": decides the page from roles and access request. */
 export const LANDING_PATH = "/area-riservata";
 
-const PUBLIC_PREFIXES = ["/accedi", "/auth", "/registrati", "/password-dimenticata", "/privacy"];
+/** Public demo of the customer area: `/demo` enters, `/demo/esci` leaves. */
+export const DEMO_ENTRY_PATH = "/demo";
+export const DEMO_EXIT_PATH = "/demo/esci";
+/** Cookie that marks a demo visitor. It opens `/app/**` only, and only without a real session. */
+export const DEMO_COOKIE = "ia_demo";
+/** Request header set by the middleware (and only by it) when the request is served in demo mode. */
+export const DEMO_HEADER = "x-ia-demo";
+/** Query parameter added when a demo visitor is sent back from a closed address (downloads). */
+export const DEMO_BLOCKED_PARAM = "demo";
+export const DEMO_BLOCKED_VALUE = "sola-lettura";
+
+const PUBLIC_PREFIXES = [
+  "/accedi",
+  "/auth",
+  "/registrati",
+  "/password-dimenticata",
+  "/privacy",
+  DEMO_ENTRY_PATH,
+];
 /** Entry points with no page of their own: not worth remembering as `next`. */
 const ENTRY_PATHS = ["/", LANDING_PATH, "/benvenuto"];
 /** Pages for signed-out visitors only: a signed-in user is sent onward. */
@@ -66,4 +84,42 @@ export function safeNextPath(value: string | null | undefined): string {
   const path = value.split(/[?#]/)[0];
   if (path === SIGN_IN_PATH || path === SIGN_UP_PATH) return DEFAULT_AFTER_SIGN_IN;
   return value;
+}
+
+const CUSTOMER_AREA = "/app";
+
+/**
+ * What the demo cookie means for one request.
+ *
+ * - `none`: no demo. Either there is no cookie, or a real session exists (it always wins),
+ *   or the address is outside the customer area: `/admin`, `/api`, the account pages and
+ *   everything else follow the normal rules, as for any signed-out visitor.
+ * - `demo`: a page (or a server action) under `/app`, served with the in-memory data.
+ * - `blocked`: an address under `/app` that stays closed in demo (downloads and exports).
+ *   `redirectTo` is the page the visitor is sent back to.
+ */
+export type DemoDecision = { mode: "none" } | { mode: "demo" } | { mode: "blocked"; redirectTo: string };
+
+export function demoDecision(input: {
+  pathname: string;
+  hasDemoCookie: boolean;
+  signedIn: boolean;
+}): DemoDecision {
+  const { pathname, hasDemoCookie, signedIn } = input;
+  if (!hasDemoCookie || signedIn) return { mode: "none" };
+  if (pathname !== CUSTOMER_AREA && !pathname.startsWith(`${CUSTOMER_AREA}/`)) return { mode: "none" };
+  const segments = pathname.split("/").filter((segment) => segment !== "");
+  // Anything odd in the path is not worth guessing about.
+  if (segments.some((segment) => segment === "." || segment === ".." || segment.includes("\\"))) {
+    return { mode: "none" };
+  }
+  if (segments[segments.length - 1] === "export") {
+    return { mode: "blocked", redirectTo: `/${segments.slice(0, -1).join("/")}` };
+  }
+  return { mode: "demo" };
+}
+
+/** Supabase session cookies (`sb-<project>-auth-token`, possibly split in `.0`, `.1`…). */
+export function isSupabaseAuthCookie(name: string): boolean {
+  return /^sb-.+-auth-token(\.\d+)?$/.test(name);
 }

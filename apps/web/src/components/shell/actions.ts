@@ -1,4 +1,5 @@
 "use server";
+import { clearDemoCookie, isDemoRequest } from "@/lib/demo/server";
 import { clearOrgCookie, setOrgCookie } from "@/lib/org-cookie";
 import { isUuid } from "@/lib/org-selection";
 import { SIGN_IN_PATH } from "@/lib/routes";
@@ -42,6 +43,11 @@ export async function endSupportSession(): Promise<void> {
 }
 
 export async function signOut(): Promise<void> {
+  // Demo visitor: there is no account to sign out of; leave the demo without touching Supabase.
+  if (await isDemoRequest()) {
+    await clearDemoCookie();
+    redirect("/");
+  }
   const supabase = await createClient();
   const { data } = await supabase.auth.getUser();
   if (data.user) await closeSupportSessions(supabase, data.user.id);

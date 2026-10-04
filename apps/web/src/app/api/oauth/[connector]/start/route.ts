@@ -1,6 +1,7 @@
 import { canConnect } from "@/lib/connections/access";
 import { OAUTH_STATE_COOKIE, OAUTH_STATE_TTL_SECONDS, createOAuthState } from "@/lib/connections/oauth-state";
 import { connectorEnv, oauthStateSecret } from "@/lib/connections/server";
+import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { isUuid } from "@/lib/org-selection";
 import { requireOrgManager } from "@/lib/session";
 import { hasServiceKey } from "@/lib/supabase/service";
@@ -15,6 +16,8 @@ import { type NextRequest, NextResponse } from "next/server";
  */
 export async function GET(request: NextRequest, { params }: { params: Promise<{ connector: string }> }) {
   const context = await requireOrgManager();
+  // Closed in the demo (the middleware already keeps demo visitors out of /api).
+  if (context.demo) return new Response(DEMO_READ_ONLY_MESSAGE, { status: 403 });
   const { connector: key } = await params;
   const base = await appUrl();
   const back = (outcome: string) => NextResponse.redirect(`${base}/app/collegamenti?esito=${outcome}`);

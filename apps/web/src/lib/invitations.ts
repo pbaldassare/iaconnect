@@ -1,5 +1,6 @@
 import "server-only";
 import { writeAudit } from "@/lib/audit";
+import { assertNotDemo } from "@/lib/demo/server";
 import type { InviteMailOutcome } from "@/lib/invite-messages";
 import { createServiceClient, hasServiceKey } from "@/lib/supabase/service";
 import type { Db } from "@/lib/supabase/types";
@@ -40,6 +41,8 @@ export async function inviteToOrganization(
     .single();
   if (error) return { ok: false, error };
 
+  // Never reached in the demo (the insert above is refused); kept as a second lock.
+  await assertNotDemo();
   if (!hasServiceKey()) return { ok: true, mail: "no_key" };
   const { error: mailError } = await createServiceClient().auth.admin.inviteUserByEmail(email, {
     redirectTo: `${await appUrl()}/auth/callback?next=${encodeURIComponent("/imposta-password")}`,

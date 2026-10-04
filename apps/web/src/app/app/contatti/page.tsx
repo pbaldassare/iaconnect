@@ -11,7 +11,7 @@ import { errorMessage } from "@/lib/action";
 import { hasConsent, parseConsents } from "@/lib/contacts/consents";
 import { contactSearchFilter } from "@/lib/contacts/fields";
 import { CHANNEL_KEYS, channelLabel } from "@/lib/customer-labels";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatPhone } from "@/lib/format";
 import { firstParam, pageWindow, parsePage, withParams } from "@/lib/pagination";
 import { requireOrg } from "@/lib/session";
 import { normalizePhone } from "@ia-connect/core";
@@ -155,7 +155,9 @@ export default async function ContactsPage({
                       </Link>
                     </Td>
                     <Td muted>
-                      <span className="block break-all">{contact.phones[0] ?? "—"}</span>
+                      <span className="block break-all">
+                        {contact.phones[0] ? formatPhone(contact.phones[0]) : "—"}
+                      </span>
                       {contact.emails[0] ? (
                         <span className="block break-all">{contact.emails[0]}</span>
                       ) : null}
