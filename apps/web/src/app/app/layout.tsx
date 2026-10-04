@@ -43,7 +43,7 @@ export default async function CustomerLayout({ children }: { children: ReactNode
       }
       headerExtra={
         <Link
-          href="/app#notifiche"
+          href="/app/notifiche"
           className="relative flex size-10 items-center justify-center rounded-lg text-ink hover:bg-surface-2"
         >
           <Icon

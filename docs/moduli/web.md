@@ -345,3 +345,268 @@ Limiti noti:
 - Chi ha già un account e viene invitato in una seconda azienda la vede dal prossimo accesso.
 - La ricerca di un utente per mail scorre gli utenti del progetto (fino a 5.000): con il
   progetto condiviso va bene, con molti utenti servirà una funzione SQL dedicata.
+
+## Inbox, Contatti, Trattative, Report, Impostazioni, Approvazioni, Notifiche
+
+Sezioni dell'area cliente costruite sopra le fondamenta. Tutte chiamano `requireOrg()`,
+filtrano per `organization_id`, non usano select annidate e tengono la logica in funzioni
+pure con test.
+
+### Pagine
+
+| Indirizzo | Chi | Cosa |
+| --- | --- | --- |
+| `/app/inbox` | membri | elenco delle conversazioni: viste (tutte, da gestire, automatiche, non lette, chiuse), canale, ricerca per nome / telefono / mail |
+| `/app/inbox/[id]` | membri | la conversazione: messaggi, stato di consegna, scheda del contatto, azioni e campo di scrittura. Su schermo stretto è una pagina a sé, su schermo largo sta accanto all'elenco |
+| `/app/contatti`, `/nuovo`, `/[id]`, `/[id]/modifica` | membri | elenco con ricerca e pagine, creazione, scheda (dati, consensi, memoria, storia, trattative, conversazioni), modifica |
+| `/app/contatti/[id]/export` | membri | scarica il JSON di `export_contact` (registrato come `contact.export`) |
+| `/app/trattative` | membri | colonne per fase con totali; `?vista=elenco` per l'elenco con filtri (stato, fase, assegnatario) |
+| `/app/trattative/nuova`, `/[id]` | membri | creazione a mano (`?contatto=<id>` preseleziona il contatto), scheda con modifica, fase, origine, storia |
+| `/app/report` | membri | `?periodo=` `questo-mese` (predefinito), `mese-scorso`, `7-giorni`, `30-giorni`, `90-giorni` |
+| `/app/impostazioni` | membri | indice delle sezioni |
+| `/app/impostazioni/utenti`, `/modelli`, `/modelli/nuovo`, `/modelli/[id]`, `/assistente`, `/marchio`, `/fasi`, `/campi`, `/privacy` | tutti leggono, **scrive solo chi gestisce** (`requireOrgManager` nelle azioni) | utenti e inviti, modelli di messaggio, assistente IA, marchio, fasi e campi delle trattative, dati e privacy |
+| `/app/impostazioni/privacy/export` | chi gestisce | scarica il JSON di `export_organization` |
+| `/app/approvazioni` | membri | richieste in attesa (Approva / Rifiuta) e storico |
+| `/app/notifiche` | membri | notifiche, prima quelle da leggere; la campanella del guscio porta qui |
+
+Approvazioni e Notifiche non sono nella barra laterale (`CUSTOMER_NAV` resta di otto voci,
+come da test): ci si arriva dalla campanella, dal pulsante «Approvazioni» in Notifiche e,
+quando ce ne sono in attesa, dal pulsante in cima all'Inbox.
+
+Le sezioni Inbox, Trattative e Report rispettano le funzioni `inbox`, `deals`, `reports` di
+`org_features` (`lib/feature-gate.ts`): se spente mostrano un avviso al posto della pagina.
+
+### Dove sta la logica
+
+| Modulo (puro, con test) | Cosa |
+| --- | --- |
+| `lib/customer-labels.ts` | etichette di canali, stati di consegna, approvazione dei modelli, fasi; `safeInternalLink` per i link delle notifiche |
+| `lib/inbox/window.ts` | stato della finestra WhatsApp di 24 ore e modalità del campo di scrittura |
+| `lib/inbox/filters.ts` | filtri e conteggi dell'elenco, anteprima del messaggio |
+| `lib/message-templates.ts` | segnaposto `{{1}}`, `{{2}}`: elenco, anteprima, controlli |
+| `lib/contacts/consents.ts` | lettura, concessione e revoca del consenso (la revoca resta scritta con data e origine) |
+| `lib/contacts/fields.ts`, `timeline.ts` | telefoni, mail, campi personalizzati, filtro di ricerca; storia unica del contatto |
+| `lib/deals/board.ts` | colonne e totali, effetti di un cambio di fase (`closed_at`, riga di `deal_events`), filtri dell'elenco |
+| `lib/deals/stages.ts` | riordino delle fasi, chiavi, definizioni e valori dei campi delle trattative |
+| `lib/report/period.ts`, `metrics.ts`, `fetch.ts` | periodi, ogni cifra del report, lettura a pagine oltre le 1000 righe |
+| `lib/settings/brand.ts`, `members.ts` | marchio con `ownerPhone` / `ownerEmail`, regole su ruoli e ultimo titolare |
+
+Solo server: `lib/people.ts` (nomi degli utenti: la mail con la chiave di servizio,
+altrimenti «Utente 1a2b3c4d»), `lib/feature-gate.ts`, `lib/deals/assignees.ts`.
+
+### Come parte un messaggio scritto da un operatore
+
+`inbox/actions.ts → sendMessage`:
+
+1. legge la conversazione dell'azienda corrente;
+2. WhatsApp con finestra chiusa (o scelta «Modello approvato»): serve un modello con
+   `approval_status = 'approved'`; il testo salvato è il modello riempito, i valori vanno in
+   `meta.variables` (array, in ordine) e `template_id` punta al modello. Altrimenti testo
+   libero; per la mail l'oggetto va in `meta.subject`. Sugli altri canali un modello serve
+   solo come testo di partenza e `template_id` resta vuoto (il motore pretende
+   l'approvazione per ogni messaggio con `template_id`);
+3. inserisce la riga in `messages` con `direction = 'out'`, `delivery_status = 'queued'`,
+   `sent_by_user_id`;
+4. chiede il lavoro `send_message` con `{ message_id }` (`requestJob`, chiave
+   `send_message:<id>`); se la richiesta fallisce il messaggio diventa `failed` con il motivo;
+5. se la conversazione era dell'automazione passa a chi ha scritto (una persona che
+   risponde non deve incrociarsi con l'IA) e torna aperta.
+
+Consenso, quota e finestra li controlla il motore: un rifiuto torna come
+`delivery_status = 'failed'` + `error` e si legge sotto il messaggio. La pagina avvisa prima
+(consenso mancante, finestra chiusa) ma non blocca. L'Inbox si aggiorna da sola ogni 10
+secondi con `router.refresh()` quando la scheda è visibile (Realtime non è usato: non
+verificato sullo schema `ia_connect`). Il contatore dei non letti si azzera all'apertura
+della conversazione, da un componente client (non durante il rendering).
+
+### Altre regole
+
+- **Presa in carico**: `assignee_type = 'user'` + `assignee_user_id`; «Riaffida
+  all'automazione» li riporta a `automation` / `null`.
+- **Cambio di fase**: aggiorna la trattativa solo se è ancora nella fase letta (due persone
+  che spostano insieme: la seconda riceve un avviso), poi inserisce `deal_events`
+  (`stage_changed`, da / a, attore). Creazione a mano → evento `created`; modifica dei dati
+  → evento `updated` con i campi cambiati.
+- **Prossima azione**: è un giorno, salvato a mezzogiorno UTC.
+- **Fasi**: una fase con trattative non si elimina; serve sempre almeno una fase aperta; i
+  flussi usano `key`, che non cambia quando si rinomina.
+- **Modelli**: solo WhatsApp ha lo stato di approvazione (impostato a mano dopo
+  l'approvazione su Meta) e `external_name`; gli altri canali vengono salvati come `approved`.
+  I flussi richiamano i modelli WhatsApp per nome.
+- **Report**: giorni e mesi in UTC. Ogni tabella è letta fino a 10.000 righe; oltre, la
+  pagina dice quali cifre sono parziali. La spesa IA è mostrata in dollari e non è sottratta
+  al valore vinto (è compresa nel piano).
+- **Eliminare un contatto**: conferma scrivendo ELIMINA; il database cancella a cascata
+  conversazioni, messaggi, trattative e appuntamenti.
+
+### Limiti e punti aperti
+
+- Ricerca dei contatti: il nome anche per una parte; telefono e mail solo per intero
+  (`phones` ed `emails` sono array: PostgREST non cerca dentro i singoli elementi). La
+  ricerca dell'Inbox invece è fatta in memoria sulle 400 conversazioni più recenti e trova
+  anche parti di numero.
+- Un collaboratore vede solo la propria riga di `memberships` (RLS): può assegnare una
+  trattativa a sé stesso o lasciare chi c'è; l'elenco completo lo vede chi gestisce.
+- Cambio di fase, creazione e modifica di una trattativa sono due scritture (trattativa, poi
+  evento) senza transazione: se la seconda fallisce la storia perde una riga (l'errore è nei log).
+- Il riordino delle fasi scrive una riga alla volta.
+- La colonna di una fase mostra 30 trattative; le altre sono nell'elenco. Oltre 3.000
+  trattative i totali delle colonne sono parziali e la pagina lo dice.
+- `export_organization` include `connections.webhook_token`: va trattato come dato riservato.
+- Senza `SUPABASE_SERVICE_ROLE_KEY`: gli inviti vengono registrati ma la mail non parte (la
+  pagina spiega cosa fare), e assegnatari, autori dei messaggi e utenti compaiono con un
+  codice al posto della mail.
+
+### Verifiche di queste sezioni
+
+Fatte: build, typecheck, Biome sui file di queste sezioni, e i test `inbox`, `contacts`,
+`deals`, `report` in `apps/web/test` (finestra WhatsApp, filtri dell'Inbox, anteprima dei
+modelli, consensi con revoca, campi e ricerca dei contatti, storia, colonne e totali,
+effetti del cambio di fase, riordino delle fasi, campi delle trattative, marchio, regole
+sugli utenti, periodi, ogni cifra del report compresi periodi vuoti e divisioni per zero,
+lettura a pagine).
+
+**Non verificate** (servono accesso, schema esposto e un motore acceso): ogni lettura e
+scrittura reale di queste pagine; l'invio di un messaggio fino alla consegna e il ritorno
+di un rifiuto; la ripresa di un flusso dopo un'approvazione; il filtro `or(...)` della
+ricerca contatti contro PostgREST; inviti e indirizzi mail con la chiave di servizio; le due
+esportazioni; l'aspetto con dati veri nei due temi e a 380 px.
+
+## Collegamenti e Flussi
+
+Sezioni dell'area cliente. Vedono tutti i membri; creare e modificare è riservato a chi
+gestisce l'azienda (`requireOrgManager`). Le regole pure stanno in `lib/connections/*`,
+`lib/flows/*`, `lib/scrape/*` (con test in `test/connections.test.ts` e `test/flows.test.ts`).
+
+### Pagine
+
+| Indirizzo | Cosa |
+| --- | --- |
+| `/app/collegamenti` | collegamenti dell'azienda (stato, ultimo controllo, ultimo errore; quelli scaduti o in errore in evidenza con «Ricollega») e catalogo per categoria: disponibile, «Non incluso» (piano o funzione spenta), «In arrivo» (tipo senza codice) |
+| `/app/collegamenti/nuovo/[connector]` | collegamento guidato; `?ricollega=<id>` aggiorna un collegamento esistente |
+| `/app/collegamenti/[id]` | scheda: stato, dati non segreti, indirizzo del webhook, scelta della pagina Facebook, verifica / ricollega / scollega |
+| `/app/collegamenti/siti`, `/nuova`, `/[id]` | letture da siti e portali: elenco, creazione, versioni del percorso, letture eseguite |
+| `/api/oauth/[connector]/start`, `/callback` | andata e ritorno dell'autorizzazione OAuth |
+| `/app/flussi` | elenco con stato, trigger, ultima esecuzione, esecuzioni e fallite negli ultimi 7 giorni |
+| `/app/flussi/modelli` | libreria: prima i modelli del settore dell'azienda |
+| `/app/flussi/nuovo`, `/app/flussi/[id]/assistente` | assistente IA: crea o modifica |
+| `/app/flussi/[id]` | schede `?scheda=` `schema`, `controlli`, `simulazione`, `versioni`, `esecuzioni`; `?versione=<id>` sceglie la versione mostrata |
+| `/app/flussi/[id]/esecuzioni/[runId]` | una esecuzione passo per passo |
+
+### Collegamento guidato
+
+Il web chiama `connector.connect` sul server (è l'unica eccezione alla regola «il web non
+chiama i connettori»: serve una risposta immediata e i segreti non devono passare da
+`scheduled_jobs`). Ordine, in `lib/connections/server.ts` → `saveConnection`:
+
+1. `connect(input, { fetch, env })`; l'`env` passato è solo l'elenco di variabili che i
+   connettori dichiarano di leggere (`connectorEnv`).
+2. riga in `connections` con il client di sessione (RLS e registro vedono l'utente vero);
+   `config` passa da `sanitizeConfig`, che scarta chiavi dal nome di credenziale e valori
+   uguali a un segreto;
+3. `store_connection_secret` con il client di servizio; se fallisce la riga viene tolta;
+4. se il connettore ha l'azione `registerWebhook` (Stripe, waWebApi) viene chiamata con
+   l'indirizzo del collegamento; se fallisce il collegamento resta e la scheda offre
+   «Registra di nuovo il webhook». Per Twilio l'indirizzo viene scritto in
+   `config.statusCallbackUrl`.
+
+Per modalità:
+
+- `api_key`, `credentials`, `webhook`, `qr`: modulo generato da `z.toJSONSchema(inputSchema)`
+  (`schemaToFields`): l'etichetta è il testo di `.describe()`, i campi dal nome di
+  credenziale (`secret`, `token`, `password`, `key`, `authHeaderValue`…) sono campi
+  password e non tornano mai al browser; dopo un errore il modulo ripropone solo i valori
+  non segreti.
+- I segreti **generati** dal connettore (`webhook_inbound`, `signature_link`, `ghl_social`)
+  sono mostrati una sola volta nello stato dell'azione, con «Copia» e l'avviso che non
+  saranno più visibili (`revealableSecrets`). Token e chiavi scritti dal cliente non
+  vengono mai rimostrati.
+- `webhook`: indirizzo `<SUPABASE_URL>/functions/v1/webhook/c/<webhook_token>` (o
+  `WEBHOOK_PUBLIC_URL`), segreto una volta, esempio `curl` con la firma.
+- `qr`: il collegamento nasce «in errore» con il messaggio di attesa; «Controlla stato»
+  chiama `verify` subito dal server web.
+- «Verifica ora» chiede il lavoro `verify_connection`; «Scollega» chiama `disconnect`
+  (se riesce) e imposta `disconnected`.
+
+### OAuth
+
+1. `GET /api/oauth/<connector>/start[?ricollega=<id>][&pagina=<id pagina>]`: solo gestori,
+   connettore consentito all'azienda. Crea lo stato `{ org, connector, user, nonce, exp,
+   reconnect?, extra? }`, lo firma (HMAC-SHA256) e lo mette nel cookie `oauth_state`
+   (httpOnly, SameSite=Lax, 10 minuti, percorso `/api/oauth`). Al fornitore va solo il `nonce`.
+2. `GET /api/oauth/<connector>/callback`: il cookie deve avere firma valida, non essere
+   scaduto, avere il `nonce` uguale a `state`, il connettore della rotta, l'utente della
+   sessione e l'azienda corrente. Poi `connect({ code, redirectUri, ...extra })`,
+   `saveConnection`, ritorno alla scheda con `?esito=`. Qualunque altro caso torna a
+   `/app/collegamenti?esito=<motivo>` con un messaggio fisso (mai testo preso dall'indirizzo).
+3. `meta_social` con più pagine: la scheda mostra `config.availablePages`; scegliere
+   un'altra pagina ripete l'autorizzazione con `pagina=<id>` (il token delle altre pagine
+   non viene conservato).
+
+Chiave della firma: `OAUTH_STATE_SECRET`, altrimenti `SUPABASE_SERVICE_ROLE_KEY`.
+`APP_URL` deve essere l'indirizzo pubblico: l'indirizzo di ritorno registrato presso
+Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
+
+### Flussi
+
+- **Schema leggibile**: `buildDiagram` (trigger, passi, uscite con `resolveTarget`, problemi
+  accanto al passo) → `FlowDiagram`. `describeStep` dà la riga in italiano di ogni blocco.
+- **Controlli**: `validateFlow` sul server con il contesto vero (`loadFlowEnvironment`:
+  collegamenti con categoria, modelli, fasi, limiti del piano, altri flussi attivi,
+  crediti IA rimasti). Un limite assente o negativo vale «senza limite».
+- **Attivazione**: solo senza errori; scrive `status`, `active_version_id`, `trigger_event`.
+- **Versioni**: mai modificate; assistente (`ai`), modifica manuale e ripristino (`user`),
+  installazione da modello (`system`) creano una riga con `version = max + 1`
+  (`insertFlowVersion`, con nuovo tentativo se due salvataggi si scontrano).
+  `flows.trigger_event` segue l'ultima bozza solo finché il flusso non è mai stato attivato.
+- **Assistente**: permesso → `ANTHROPIC_API_KEY` → chiave di servizio → `quota_left` >
+  0 → `proposeFlow` → riga in `ai_calls` (`flow_assistant`) e `add_usage` con `creditsFor`,
+  anche quando la chiamata fallisce a metà (`AiOperationError`). La cronologia arriva dal
+  browser e viene ridotta (`sanitizeHistory`); «Salva come bozza» ricontrolla lo schema.
+- **Simulazione**: lavoro `simulate_flow`; la scheda legge `flow_runs` con
+  `mode = 'simulation'` e i loro passi e si aggiorna da sola finché il lavoro è in coda.
+- **Evento di prova**: riga in `events` (`manual.test` o il tipo del trigger) con
+  `dedupe_key = manual:<uuid>` e voce di registro `flow.test_event`. Su un flusso attivo
+  l'esecuzione è vera: la pagina lo dice.
+- Funzioni: `flow_editor` spento → il cliente vede soltanto; `flow_assistant` spento →
+  niente assistente; `scraping` spento → niente nuove letture. L'assistenza non è
+  bloccata da questi interruttori. `social`, `scraping`, `payments_signature` spenti
+  rendono «Non incluso» le rispettive categorie del catalogo.
+
+### Variabili d'ambiente in più (`apps/web`)
+
+| Variabile | Serve per |
+| --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | ogni nuovo collegamento (segreti nel Vault), scollegamento presso il fornitore, registro delle chiamate IA dell'assistente. Senza, le pagine lo dicono e rifiutano l'operazione |
+| `ANTHROPIC_API_KEY` (`AI_MODEL_SMART` facoltativa) | assistente dei flussi |
+| `OAUTH_STATE_SECRET` | firma dello stato OAuth (facoltativa: ripiego sulla chiave di servizio) |
+| `GOOGLE_CLIENT_ID/SECRET`, `MICROSOFT_CLIENT_ID/SECRET`, `META_APP_ID/SECRET`, `META_GRAPH_VERSION` | OAuth di Gmail, Google Calendar, Microsoft 365, Facebook e Instagram |
+| `WAWEBAPI_BASE_URL` | WhatsApp via QR |
+| `WEBHOOK_PUBLIC_URL` | indirizzo di base dei webhook mostrato al cliente (predefinito: la funzione del progetto Supabase) |
+
+### Non verificato
+
+Costruito senza poter accedere né leggere il database: tutto ciò che segue è coperto solo
+da tipi, build e test delle funzioni pure.
+
+- ogni lettura e scrittura di queste pagine, comprese le RLS su `connections`, `flows`,
+  `flow_versions`, `events`, `scheduled_jobs`, `scrape_recipes`, `message_templates`;
+- `store_connection_secret`, `read_connection_secret`, `add_usage`, inserimento in
+  `ai_calls` (chiave di servizio);
+- `connect`, `verify`, `disconnect`, `registerWebhook` di ogni connettore contro il
+  servizio reale; l'intero giro OAuth con app vere;
+- l'assistente con una chiave Anthropic vera; tempi di risposta dentro i limiti di durata
+  delle azioni server dell'hosting;
+- la forma reale di `flow_run_steps.output` in simulazione: la pagina mette in evidenza i
+  campi che riconosce (`to`, `text`, `subject`, `warnings`…) e mostra sempre il JSON completo;
+- l'aspetto con dati veri, nei due temi e a 380 px.
+
+Limiti noti e ripieghi:
+
+- Il QR di waWebApi si disegna solo se arriva come immagine (`data:image/…`); un testo
+  grezzo viene mostrato da copiare (non c'è una libreria per generare il QR).
+- I segreti di un collegamento scollegato restano nel Vault (non esiste una funzione per
+  toglierli).
+- Cambiare pagina Facebook richiede una nuova autorizzazione (vedi OAuth).
+- I conteggi dell'elenco dei flussi leggono le ultime 1000 esecuzioni reali.
+- Gli avvisi del motore sui collegamenti puntano a `/collegamenti` (manca `/app`).

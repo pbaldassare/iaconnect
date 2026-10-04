@@ -28,9 +28,11 @@ const OPERATION: Record<string, string> = {
 /** Explicit actions written through lib/audit.ts (not by the database triggers). */
 const EXPLICIT: Record<string, string> = {
   "organization.export": "Esportazione dei dati dell'azienda",
+  "contact.export": "Esportazione dei dati di un contatto",
   "organization.invite_sent": "Invito inviato via mail",
   "support.enter": "Ingresso in assistenza",
   "support.exit": "Uscita dall'assistenza",
+  "flow.test_event": "Evento di prova inserito per un flusso",
 };
 
 /** Jobs requested for the worker through lib/jobs.ts (`job.<kind>`). */

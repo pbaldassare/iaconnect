@@ -1,10 +1,12 @@
-import { Placeholder } from "@/components/placeholder";
-import { requireOrg } from "@/lib/session";
 import type { Metadata } from "next";
+import { InboxView } from "./inbox-view";
 
 export const metadata: Metadata = { title: "Inbox" };
 
-export default async function InboxPage() {
-  await requireOrg();
-  return <Placeholder title="Inbox" description="Le conversazioni di tutti i canali in un posto solo." />;
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  return <InboxView params={await searchParams} selectedId={null} />;
 }
