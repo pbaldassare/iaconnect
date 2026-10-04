@@ -126,6 +126,14 @@ export function validateFlow(input: unknown, context: ValidationContext): Valida
         error("connection", `Serve un collegamento attivo di tipo "${block.requires}".`, step.id);
       } else if (chosen.status !== "active") {
         error("connection", `Il collegamento scelto non è attivo (stato: ${chosen.status}).`, step.id);
+      } else if (!wanted && candidates.filter((item) => item.status === "active").length > 1) {
+        // The worker refuses to guess between several active connections (only a reply inside
+        // a conversation follows that conversation's connection): say it before activation.
+        warning(
+          "connection_ambiguous",
+          `Ci sono più collegamenti attivi di tipo "${block.requires}": indica nel passo quale usare, altrimenti il passo si ferma (tranne quando risponde in una conversazione già aperta).`,
+          step.id,
+        );
       }
     }
 

@@ -75,7 +75,7 @@ che cambia da un'azienda all'altra sta nel database.
 | `approval_decided` | `approval_id` | Legge la decisione dal database e riprende da `onApproved` o `onRejected`. |
 | `simulate_flow` | `flow_version_id`, `limit?` | Simula la versione sugli ultimi eventi compatibili (3, massimo 10). |
 | `scrape_run` | `recipe_id` | Esegue una ricetta. |
-| `scrape_trace` | `recipe_id` | Prima tracciatura con l'IA. La ricetta resta `draft` finché il cliente non la attiva. |
+| `scrape_trace` | `recipe_id` | Prima tracciatura con l'IA. La ricetta resta `draft` finché il cliente non la attiva. Se non esce un percorso che funziona il lavoro finisce `failed` con il motivo in `last_error` (senza altri tentativi: costerebbero crediti IA) e parte un avviso: è da lì che la pagina della lettura lo capisce. |
 | `poll_connection` | `connection_id` | Chiama `connector.poll`, salva il cursore in `connections.config.cursor`, inserisce gli eventi, si ripianifica. |
 | `verify_connection` | `connection_id` | Chiama `connector.verify`, aggiorna stato e ultimo controllo; avvisa quando lo stato diventa `expired` o `error`. |
 | `report` | — | Riepilogo settimanale con semplici conteggi, senza IA. |
@@ -91,6 +91,13 @@ solo `send_message`, `approval_decided`, `simulate_flow`, `scrape_run`,
 `scrape_trace`, `verify_connection`; cerca ogni record con
 `organization_id` del lavoro, mai con il solo id del contenuto; rifiuta gli id
 che non sono uuid. Un lavoro rifiutato diventa `failed` senza altri tentativi.
+Il contenuto di questi lavori è controllato con `USER_JOB_PAYLOADS` di
+`packages/core/src/jobs.ts`, lo stesso schema con cui il web lo costruisce.
+
+**Avvisi.** Gli indirizzi in `notifications.link` si scrivono solo con `APP_LINKS`
+(`packages/core/src/links.ts`): sono pagine vere del web, sotto `/app` (collegamento,
+conversazione, approvazioni, esecuzione fallita, lettura da sito, report). Un test li
+confronta con le cartelle di `apps/web/src/app`.
 
 ## Simulazione
 
@@ -128,7 +135,9 @@ Variabili d'ambiente:
 | `DATABASE_SSL` | `false` per un database locale senza TLS. `DATABASE_SSL_VERIFY=true` per verificare il certificato. |
 | `ANTHROPIC_API_KEY` | Senza chiave i blocchi IA falliscono con un messaggio chiaro e lo scraping non si ripara. |
 | `AI_MODEL_SMART`, `AI_MODEL_FAST` | Facoltative: modelli diversi da quelli predefiniti (gli stessi nomi di `packages/ai`). I vecchi `AI_SMART_MODEL` e `AI_FAST_MODEL` sono ancora letti. |
+| `DATABASE_POOL_SIZE` | Connessioni al database (predefinito 10). |
 | `WORKER_CONCURRENCY` | Eventi e lavori in parallelo (predefinito 4). |
+| `WORKER_MAX_ATTEMPTS` | Consegne di un evento o lavoro prima di segnarlo fallito (predefinito 5). |
 | `OUTBOUND_OVERRIDE_RECIPIENT` | Ambienti non di produzione: ogni invio va a questo destinatario (telefono e/o mail separati da virgola). I canali senza destinatario di prova sono bloccati. |
 | `WHATSAPP_TEST_RECIPIENT` | Come sopra, solo per WhatsApp e senza bloccare gli altri canali. |
 

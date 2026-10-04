@@ -1,7 +1,7 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { TEMPLATE_APPROVAL_KEYS, isChannel } from "@/lib/customer-labels";
-import { missingPlaceholders, variableCount } from "@/lib/message-templates";
+import { missingPlaceholders, normalizeTemplateLanguage, variableCount } from "@/lib/message-templates";
 import { isUuid } from "@/lib/org-selection";
 import { requireOrgManager } from "@/lib/session";
 import { revalidatePath } from "next/cache";
@@ -17,13 +17,13 @@ const text = (formData: FormData, name: string) => {
 function readTemplateForm(formData: FormData, channel: string) {
   const fieldErrors: Record<string, string> = {};
   const name = text(formData, "name").slice(0, 80);
-  const language = text(formData, "language").toLowerCase() || "it";
+  const language = normalizeTemplateLanguage(text(formData, "language") || "it");
   const subject = text(formData, "subject").slice(0, 200);
   const body = text(formData, "body");
   const externalName = text(formData, "external_name").slice(0, 120);
   const status = text(formData, "approval_status");
   if (name.length < 2) fieldErrors.name = "Scrivi un nome.";
-  if (!/^[a-z]{2}(_[a-z]{2})?$/i.test(language)) fieldErrors.language = "Usa un codice come it, en o it_IT.";
+  if (!language) fieldErrors.language = "Usa un codice come it, en o en_US.";
   if (body.length < 2) fieldErrors.body = "Scrivi il testo del messaggio.";
   if (body.length > 4000) fieldErrors.body = "Al massimo 4.000 caratteri.";
   const missing = missingPlaceholders(channel === "mail" ? subject : "", body);
@@ -45,7 +45,7 @@ function readTemplateForm(formData: FormData, channel: string) {
     ok: true as const,
     data: {
       name,
-      language,
+      language: language ?? "it",
       subject: channel === "mail" && subject ? subject : null,
       body,
       external_name: isWhatsapp && externalName ? externalName : null,

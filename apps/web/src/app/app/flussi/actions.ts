@@ -4,6 +4,13 @@ import { writeAudit } from "@/lib/audit";
 import { parseRequirements, parseTemplateDefinition, planTemplateInstall } from "@/lib/flows/install";
 import { parseDefinitionJson } from "@/lib/flows/runs";
 import { insertFlowVersion, loadFlowEnvironment, loadFlowPermissions } from "@/lib/flows/server";
+import {
+  INBOUND_TEST_EVENT_NOTE,
+  buildTestEvent,
+  isInboundMessageEvent,
+  testEventProblem,
+} from "@/lib/flows/test-event";
+import { simulateFlowJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { type OrgContext, actorOf, requireOrgManager } from "@/lib/session";
@@ -203,10 +210,8 @@ export async function requestSimulation(
   }
   const { error } = await requestJob(context.supabase, {
     organizationId: context.org.organization.id,
-    kind: "simulate_flow",
-    payload: { flow_version_id: version.id },
     // A double click within ten seconds is one request.
-    dedupeKey: `simulate:${version.id}:${Math.floor(Date.now() / 10_000)}`,
+    ...simulateFlowJob(version.id),
     actor: actorOf(context),
   });
   if (error) {
@@ -347,15 +352,27 @@ export async function sendTestEvent(
       payload: "Serve un oggetto JSON.",
     });
   }
+  const problem = testEventProblem(type, payload as Record<string, unknown>);
+  if (problem) return fail(problem, { payload: "Manca il mittente." });
   const orgId = context.org.organization.id;
+  // A trigger limited to one connection only matches events of that connection.
+  const version = await loadVersion(context, flow.id, flow.active_version_id);
+  const definition = FlowDefinitionSchema.safeParse(version?.definition);
+  const { data: connections } = await context.supabase
+    .from("connections")
+    .select("id")
+    .eq("organization_id", orgId);
+  const row = buildTestEvent({
+    organizationId: orgId,
+    type,
+    payload: payload as Record<string, unknown>,
+    trigger: definition.success ? definition.data.trigger : null,
+    connectionIds: (connections ?? []).map((connection) => connection.id),
+    id: crypto.randomUUID(),
+  });
   const { data: event, error } = await context.supabase
     .from("events")
-    .insert({
-      organization_id: orgId,
-      type,
-      payload: payload as Json,
-      dedupe_key: `manual:${crypto.randomUUID()}`,
-    })
+    .insert({ ...row, payload: row.payload as Json })
     .select("id")
     .single();
   if (error) return failFromError(error);
@@ -371,9 +388,11 @@ export async function sendTestEvent(
     isSupportAccess: actor.type === "admin",
   });
   refresh(flow.id);
+  const note = isInboundMessageEvent(type) ? ` ${INBOUND_TEST_EVENT_NOTE}` : "";
   return ok(
-    flow.status === "active"
+    (flow.status === "active"
       ? "Evento di prova inserito. Se corrisponde al trigger, l'esecuzione compare qui tra poco: è un'esecuzione vera, i messaggi partono davvero."
-      : "Evento di prova inserito. Il flusso non è attivo, quindi non partirà: puoi usarlo per la simulazione.",
+      : "Evento di prova inserito. Il flusso non è attivo, quindi non partirà: puoi usarlo per la simulazione.") +
+      note,
   );
 }

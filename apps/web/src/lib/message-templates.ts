@@ -57,3 +57,14 @@ export function checkVariables(body: string, variables: readonly string[]): stri
   }
   return null;
 }
+
+/**
+ * Language code of a template as the provider expects it: "it", "en_US", "pt_BR".
+ * The worker passes `message_templates.language` to WhatsApp as it is, and Meta's codes are
+ * case sensitive: the language is lower case, the region upper case. Null when it is not a code.
+ */
+export function normalizeTemplateLanguage(input: string | null | undefined): string | null {
+  const match = /^([a-z]{2,3})(?:[_-]([a-z]{2}))?$/i.exec((input ?? "").trim());
+  if (!match) return null;
+  return match[2] ? `${match[1]!.toLowerCase()}_${match[2].toUpperCase()}` : match[1]!.toLowerCase();
+}

@@ -1,7 +1,15 @@
 {
   "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
   "files": {
-    "ignore": ["**/node_modules", "**/.next", "**/dist", "site", "**/*.gen.ts", "apps/web/next-env.d.ts"]
+    "ignore": [
+      "**/node_modules",
+      "**/.next",
+      "**/dist",
+      "site",
+      "**/*.gen.ts",
+      "apps/web/next-env.d.ts",
+      "apps/web/test/fixtures"
+    ]
   },
   "formatter": {
     "indentStyle": "space",

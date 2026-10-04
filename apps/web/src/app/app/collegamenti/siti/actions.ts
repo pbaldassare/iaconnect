@@ -1,6 +1,7 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok, parseForm } from "@/lib/action";
 import { isFeatureEnabled } from "@/lib/features";
+import { scrapeRunJob, scrapeTraceJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { type OrgContext, actorOf, requireOrgManager } from "@/lib/session";
@@ -50,10 +51,6 @@ async function loadRecipe(context: OrgContext, recipeId: string): Promise<Row<"s
   return data;
 }
 
-function minuteKey(prefix: string, id: string): string {
-  return `${prefix}:${id}:${Math.floor(Date.now() / 60_000)}`;
-}
-
 /** Creates the recipe as a draft and asks the worker to trace the site (the only AI step). */
 export async function createRecipe(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
   const context = await requireOrgManager();
@@ -96,9 +93,7 @@ export async function createRecipe(_prev: ActionResult, formData: FormData): Pro
 
   const job = await requestJob(context.supabase, {
     organizationId: orgId,
-    kind: "scrape_trace",
-    payload: { recipe_id: recipe.id },
-    dedupeKey: minuteKey("trace-now", recipe.id),
+    ...scrapeTraceJob(recipe.id),
     actor: actorOf(context),
   });
   revalidatePath(BASE);
@@ -153,9 +148,7 @@ export async function runRecipeNow(
   }
   const { error } = await requestJob(context.supabase, {
     organizationId: context.org.organization.id,
-    kind: "scrape_run",
-    payload: { recipe_id: recipe.id },
-    dedupeKey: minuteKey("scrape-now", recipe.id),
+    ...scrapeRunJob(recipe.id),
     actor: actorOf(context),
   });
   if (error) {
@@ -178,9 +171,7 @@ export async function retraceRecipe(
   if (!(await scrapingEnabled(context))) return fail("La lettura da siti non è attiva per la tua azienda.");
   const { error } = await requestJob(context.supabase, {
     organizationId: context.org.organization.id,
-    kind: "scrape_trace",
-    payload: { recipe_id: recipe.id },
-    dedupeKey: minuteKey("trace-now", recipe.id),
+    ...scrapeTraceJob(recipe.id),
     actor: actorOf(context),
   });
   if (error) {

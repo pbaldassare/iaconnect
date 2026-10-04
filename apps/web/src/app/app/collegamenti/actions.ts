@@ -10,6 +10,7 @@ import {
   registerWebhook,
   saveConnection,
 } from "@/lib/connections/server";
+import { verifyConnectionJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { type OrgContext, actorOf, requireOrgManager } from "@/lib/session";
@@ -149,10 +150,8 @@ export async function verifyConnectionNow(
   if (connection.status === "disconnected") return fail("Il collegamento è scollegato: ricollegalo prima.");
   const { error } = await requestJob(context.supabase, {
     organizationId: context.org.organization.id,
-    kind: "verify_connection",
-    payload: { connection_id: connection.id },
     // One request per connection per minute: a double click is harmless.
-    dedupeKey: `verify-now:${connection.id}:${Math.floor(Date.now() / 60_000)}`,
+    ...verifyConnectionJob(connection.id),
     actor: actorOf(context),
   });
   if (error) {

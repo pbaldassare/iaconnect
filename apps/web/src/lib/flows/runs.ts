@@ -73,54 +73,6 @@ export function stepStatus(value: string): { label: string; tone: "ok" | "warnin
   return STEP_STATUS[value] ?? { label: value, tone: "neutral" };
 }
 
-const HIGHLIGHT_KEYS: [string, string][] = [
-  ["to", "Destinatario"],
-  ["subject", "Oggetto"],
-  ["text", "Testo"],
-  ["renderedText", "Testo"],
-  ["body", "Testo"],
-  ["message", "Messaggio"],
-  ["summary", "Riassunto"],
-  ["category", "Categoria"],
-  ["lastReply", "Risposta"],
-  ["title", "Titolo"],
-  ["stage", "Fase"],
-  ["url", "Indirizzo"],
-];
-
-/**
- * The parts of a step's output worth showing at a glance (the message that
- * would be sent, who to, warnings). The full JSON stays available below it.
- */
-export function outputHighlights(output: unknown): { label: string; value: string }[] {
-  if (!output || typeof output !== "object" || Array.isArray(output)) return [];
-  const record = output as Record<string, unknown>;
-  const out: { label: string; value: string }[] = [];
-  const seen = new Set<string>();
-  const visit = (source: Record<string, unknown>) => {
-    for (const [key, label] of HIGHLIGHT_KEYS) {
-      const value = source[key];
-      if ((typeof value !== "string" && typeof value !== "number") || value === "") continue;
-      const text = String(value);
-      if (seen.has(`${label}:${text}`)) continue;
-      seen.add(`${label}:${text}`);
-      out.push({ label, value: text });
-    }
-  };
-  visit(record);
-  for (const nested of ["wouldSend", "message", "simulated", "contact", "deal"]) {
-    const value = record[nested];
-    if (value && typeof value === "object" && !Array.isArray(value)) visit(value as Record<string, unknown>);
-  }
-  const warnings = record.warnings;
-  if (Array.isArray(warnings)) {
-    for (const warning of warnings) {
-      if (typeof warning === "string" && warning) out.push({ label: "Attenzione", value: warning });
-    }
-  }
-  return out;
-}
-
 /** "1,2 s", "340 ms". */
 export function formatDuration(ms: number | null | undefined): string {
   if (ms === null || ms === undefined || ms < 0) return "—";

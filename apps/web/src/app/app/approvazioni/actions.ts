@@ -1,5 +1,6 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
+import { approvalDecidedJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { actorOf, requireOrg } from "@/lib/session";
@@ -17,10 +18,11 @@ export async function decideApproval(
   const context = await requireOrg();
   const { supabase, org, session } = context;
   if (!isUuid(approvalId)) return fail("Approvazione non valida.");
+  const decidedAt = new Date();
   // Only a pending row can be decided: a second click or a colleague's decision changes nothing.
   const { data: updated, error } = await supabase
     .from("approvals")
-    .update({ status: decision, decided_by: session.user.id, decided_at: new Date().toISOString() })
+    .update({ status: decision, decided_by: session.user.id, decided_at: decidedAt.toISOString() })
     .eq("id", approvalId)
     .eq("organization_id", org.organization.id)
     .eq("status", "pending")
@@ -32,9 +34,7 @@ export async function decideApproval(
   }
   const job = await requestJob(supabase, {
     organizationId: org.organization.id,
-    kind: "approval_decided",
-    payload: { approval_id: approvalId },
-    dedupeKey: `approval_decided:${approvalId}`,
+    ...approvalDecidedJob(approvalId, decidedAt),
     actor: actorOf(context),
   });
   if (job.error) {

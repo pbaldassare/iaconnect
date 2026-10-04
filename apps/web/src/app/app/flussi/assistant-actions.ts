@@ -8,7 +8,13 @@ import { isUuid } from "@/lib/org-selection";
 import { requireOrgManager } from "@/lib/session";
 import { MissingServiceKeyError, createServiceClient, hasServiceKey } from "@/lib/supabase/service";
 import { AiOperationError, type FlowProposal, proposeFlow } from "@ia-connect/ai";
-import { type AiUsage, type FlowDefinition, FlowDefinitionSchema, creditsFor } from "@ia-connect/core";
+import {
+  type AiUsage,
+  type FlowDefinition,
+  FlowDefinitionSchema,
+  aiCallColumns,
+  hasSpentTokens,
+} from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
 import type {
   AssistantReply,
@@ -21,17 +27,16 @@ const NO_ASSISTANT = "L'assistente dei flussi non è attivo per la tua azienda."
 
 /** Every AI call is written to `ai_calls` and counted in the month's AI credits (service role: users cannot write either). */
 async function recordUsage(organizationId: string, usage: AiUsage): Promise<number> {
-  const credits = creditsFor(usage);
+  // Same columns and rounding as the worker (`aiCallColumns`): `cost_micros` is a bigint
+  // column and the computed cost can be fractional.
+  const call = aiCallColumns(usage);
+  const credits = call.credits;
   try {
     const service = createServiceClient();
     const { error } = await service.from("ai_calls").insert({
       organization_id: organizationId,
       purpose: "flow_assistant",
-      model: usage.model,
-      input_tokens: usage.inputTokens,
-      output_tokens: usage.outputTokens,
-      cost_micros: usage.costMicros,
-      credits,
+      ...call,
     });
     if (error) console.error("[assistant] ai_calls insert failed", error.code);
     const { error: usageError } = await service.rpc("add_usage", {
@@ -142,7 +147,9 @@ export async function askAssistant(request: AssistantRequest): Promise<Assistant
       validation: { ...environment.validation, activeFlows: undefined },
     });
   } catch (error) {
-    if (error instanceof AiOperationError) await recordUsage(orgId, error.usage);
+    // Like the worker: a call that failed after spending tokens is recorded; one that never started is not.
+    if (error instanceof AiOperationError && hasSpentTokens(error.usage))
+      await recordUsage(orgId, error.usage);
     console.error("[assistant] proposeFlow failed", (error as Error)?.name ?? "");
     return {
       ok: false,

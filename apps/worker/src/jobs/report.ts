@@ -1,3 +1,4 @@
+import { APP_LINKS } from "@ia-connect/core";
 import { type JobRow, notify } from "../db/repo.ts";
 import { iso } from "../db/sql.ts";
 import type { Deps } from "../deps.ts";
@@ -33,7 +34,7 @@ export async function report(deps: Deps, job: JobRow): Promise<JobResult> {
       `Flussi eseguiti: ${counts.runs} (non completati: ${counts.failed}). ` +
       `Messaggi inviati: ${counts.sent}, ricevuti: ${counts.received}. ` +
       `Nuovi contatti: ${counts.contacts}. Nuove trattative: ${counts.deals}, chiuse con successo: ${counts.won}.`,
-    link: "/report",
+    link: APP_LINKS.report(),
   });
   return { rescheduleAt: new Date(now.getTime() + WEEK_MS) };
 }

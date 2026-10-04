@@ -4,7 +4,7 @@ import type { Deps } from "../deps.ts";
 import { executeRun, signalRun } from "../engine/engine.ts";
 import { createRun, triggerMatches } from "../events.ts";
 import { RejectedJob } from "../queue.ts";
-import { type JobResult, uuid } from "./types.ts";
+import { type JobResult, userPayload, uuid } from "./types.ts";
 
 async function ownRun(deps: Deps, job: JobRow, runId: string): Promise<void> {
   const rows = await deps.sql.query(
@@ -39,7 +39,7 @@ export async function waitTimeout(deps: Deps, job: JobRow): Promise<JobResult> {
 
 /** The decision is read from the database, never from the payload. */
 export async function approvalDecided(deps: Deps, job: JobRow): Promise<JobResult> {
-  const approvalId = uuid((job.payload as { approval_id?: unknown }).approval_id);
+  const approvalId = userPayload("approval_decided", job).approval_id;
   const rows = await deps.sql.query<{
     flow_run_id: string;
     step_id: string;
@@ -87,8 +87,8 @@ async function simulationLink(deps: Deps, event: EventRow) {
 
 /** Runs a flow version in simulation over the organization's most recent matching events. */
 export async function simulateFlow(deps: Deps, job: JobRow): Promise<JobResult> {
-  const payload = job.payload as { flow_version_id?: unknown; limit?: unknown };
-  const versionId = uuid(payload.flow_version_id);
+  const payload = userPayload("simulate_flow", job);
+  const versionId = payload.flow_version_id;
   const organizationId = job.organization_id!;
   const versions = await deps.sql.query<{ flow_id: string; definition: unknown }>(
     "select flow_id, definition from ia_connect.flow_versions where id = $1 and organization_id = $2",
@@ -98,7 +98,7 @@ export async function simulateFlow(deps: Deps, job: JobRow): Promise<JobResult> 
   const parsed = FlowDefinitionSchema.safeParse(versions[0].definition);
   if (!parsed.success) throw new RejectedJob("flow version with an invalid definition");
   const definition = parsed.data;
-  const limit = Math.min(Math.max(Number(payload.limit) || 3, 1), 10);
+  const limit = payload.limit ?? 3;
 
   const recent = await deps.sql.query<EventRow>(
     `select * from ia_connect.events where organization_id = $1 and type = $2

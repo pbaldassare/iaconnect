@@ -174,8 +174,9 @@ export const dealCreate: Executor<DealCreateParams> = {
     const stage = await findStage(ctx.sql, ctx.org.id, params.stage);
     const rows = await ctx.sql.query<{ id: string }>(
       `insert into ia_connect.deals
-         (organization_id, contact_id, title, stage_id, estimated_value_cents, origin_flow_run_id, next_action, custom_fields)
-       values ($1, $2, $3, $4, $5::bigint, $6, $7, $8::jsonb) returning id`,
+         (organization_id, contact_id, title, stage_id, estimated_value_cents, origin_flow_run_id, next_action,
+          custom_fields, closed_at)
+       values ($1, $2, $3, $4, $5::bigint, $6, $7, $8::jsonb, $9::timestamptz) returning id`,
       [
         ctx.org.id,
         ctx.run.contact_id,
@@ -185,6 +186,8 @@ export const dealCreate: Executor<DealCreateParams> = {
         ctx.run.id,
         params.nextAction ?? null,
         json(params.fields ?? {}),
+        // A deal born in a won/lost stage is closed from the start (same rule as the web app and `deal.update_stage`).
+        stage.kind === "open" ? null : iso(ctx.now),
       ],
     );
     const dealId = rows[0]!.id;

@@ -173,10 +173,10 @@ export async function previewFromFlow(ctx: StepContext, message: FlowMessage) {
     | { phone?: string | null; email?: string | null; consents?: ContactConsents }
     | undefined;
   const contact = await recipient(ctx, message);
-  const to =
-    message.to ??
-    (message.channel === "mail" ? virtual?.email : virtual?.phone) ??
-    (contact ? addressOf(contact, message.channel) : undefined);
+  // Same rule as `addressOf`: a phone is no address on mail, and neither phone nor mail is one on social.
+  const virtualAddress =
+    message.channel === "mail" ? virtual?.email : message.channel === "social" ? undefined : virtual?.phone;
+  const to = message.to ?? virtualAddress ?? (contact ? addressOf(contact, message.channel) : undefined);
   const consents = { ...(contact?.consents ?? {}), ...(virtual?.consents ?? {}) };
   const conversation =
     contact && ctx.run.conversation_id

@@ -4,7 +4,7 @@ import {
   type Channel,
   CrmReadOutput,
   type ExtractField,
-  creditsFor,
+  aiCallColumns,
   parseDuration,
 } from "@ia-connect/core";
 import { offersAction, runAction } from "../../connectors.ts";
@@ -28,7 +28,7 @@ export async function metered<T extends { usage: AiUsage }>(
     throw new StepError("I crediti IA del mese previsti dal piano sono esauriti.", "quota");
   }
   const result = await call();
-  const credits = creditsFor(result.usage);
+  const row = aiCallColumns(result.usage);
   await ctx.sql.query(
     `insert into ia_connect.ai_calls
        (organization_id, purpose, model, input_tokens, output_tokens, cost_micros, credits, flow_run_id, flow_run_step_id)
@@ -36,17 +36,17 @@ export async function metered<T extends { usage: AiUsage }>(
     [
       ctx.org.id,
       ctx.block.key,
-      result.usage.model,
-      result.usage.inputTokens,
-      result.usage.outputTokens,
-      Math.round(result.usage.costMicros),
-      credits,
+      row.model,
+      row.input_tokens,
+      row.output_tokens,
+      row.cost_micros,
+      row.credits,
       ctx.run.id,
       ctx.stepRowId,
     ],
   );
-  await addUsage(ctx.sql, ctx.org.id, "ai_credits", credits);
-  ctx.meter.aiCostMicros += Math.round(result.usage.costMicros);
+  await addUsage(ctx.sql, ctx.org.id, "ai_credits", row.credits);
+  ctx.meter.aiCostMicros += row.cost_micros;
   return result;
 }
 

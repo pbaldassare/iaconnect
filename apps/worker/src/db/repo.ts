@@ -1,4 +1,5 @@
 import {
+  type AiUsage,
   type Channel,
   type ConnectionRecord,
   type ConnectionStatus,
@@ -6,6 +7,7 @@ import {
   type ContactConsents,
   type Row,
   type UsageMetric,
+  aiCallColumns,
   normalizePhone,
 } from "@ia-connect/core";
 import { StepError } from "../errors.ts";
@@ -356,21 +358,22 @@ export async function logAiCall(
   sql: Sql,
   organizationId: string,
   purpose: string,
-  usage: { model: string; inputTokens: number; outputTokens: number; costMicros: number },
-  credits: number,
+  usage: AiUsage,
 ): Promise<void> {
+  // Same columns the web app writes for the flow assistant (`aiCallColumns`), so reports add up.
+  const call = aiCallColumns(usage);
   await sql.query(
     `insert into ia_connect.ai_calls (organization_id, purpose, model, input_tokens, output_tokens, cost_micros, credits)
      values ($1, $2, $3, $4, $5, $6, $7)`,
     [
       organizationId,
       purpose,
-      usage.model,
-      usage.inputTokens,
-      usage.outputTokens,
-      Math.round(usage.costMicros),
-      credits,
+      call.model,
+      call.input_tokens,
+      call.output_tokens,
+      call.cost_micros,
+      call.credits,
     ],
   );
-  await addUsage(sql, organizationId, "ai_credits", credits);
+  await addUsage(sql, organizationId, "ai_credits", call.credits);
 }

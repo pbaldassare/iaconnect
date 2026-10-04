@@ -3,9 +3,15 @@ import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { parseConsents } from "@/lib/contacts/consents";
 import { hasConsent } from "@/lib/contacts/consents";
 import { channelLabel } from "@/lib/customer-labels";
-import { composerMode, whatsappWindow } from "@/lib/inbox/window";
+import {
+  type OutgoingResult,
+  buildFreeMessage,
+  buildTemplateMessage,
+  outgoingMessageRow,
+  usesTemplate,
+} from "@/lib/inbox/outgoing";
+import { sendMessageJob } from "@/lib/job-requests";
 import { requestJob } from "@/lib/jobs";
-import { checkVariables, renderTemplate, variableCount } from "@/lib/message-templates";
 import { isUuid } from "@/lib/org-selection";
 import { actorOf, requireOrg } from "@/lib/session";
 import type { Json } from "@ia-connect/core";
@@ -112,16 +118,9 @@ export async function sendMessage(
   };
 
   const channel = conversation.channel;
-  const windowState = whatsappWindow(channel, conversation.window_expires_at);
-  const templateId = text("template_id");
-  const useTemplate =
-    channel === "whatsapp" && (text("mode") === "template" || composerMode(windowState) === "template_only");
-
-  let content = text("content");
-  let meta: Record<string, Json> = {};
-  let storedTemplateId: string | null = null;
-
-  if (useTemplate) {
+  let built: OutgoingResult;
+  if (usesTemplate(channel, conversation.window_expires_at, text("mode"))) {
+    const templateId = text("template_id");
     if (!isUuid(templateId))
       return fail("Scegli un modello approvato.", { template_id: "Scegli un modello." });
     const { data: template, error } = await supabase
@@ -131,53 +130,29 @@ export async function sendMessage(
       .eq("organization_id", organizationId)
       .maybeSingle();
     if (error) return failFromError(error);
-    if (!template || template.channel !== "whatsapp")
-      return fail("Questo modello non esiste più. Scegline un altro.");
-    if (template.approval_status !== "approved") {
-      return fail(
-        "Questo modello non è ancora approvato da Meta: fuori dalle 24 ore si possono inviare solo modelli approvati.",
-      );
-    }
-    const variables = formData
-      .getAll("variables")
-      .map((value) => (typeof value === "string" ? value.trim().slice(0, 500) : ""))
-      .slice(0, variableCount(template.body));
-    const problem = checkVariables(template.body, variables);
-    if (problem) return fail(problem);
-    content = renderTemplate(template.body, variables);
-    meta = { variables };
-    storedTemplateId = template.id;
+    built = buildTemplateMessage(template, formData.getAll("variables"));
   } else {
-    if (content === "") return fail("Scrivi il messaggio.", { content: "Scrivi il messaggio." });
-    if (content.length > 4000) return fail("Il messaggio è troppo lungo: al massimo 4.000 caratteri.");
-    if (channel === "mail") {
-      const subject = text("subject").slice(0, 200);
-      if (subject) meta = { subject };
-    }
+    built = buildFreeMessage(channel, text("content"), text("subject"));
   }
+  if (!built.ok) return fail(built.error, built.fieldErrors);
 
+  const row = outgoingMessageRow({
+    organizationId,
+    conversationId: conversation.id,
+    channel,
+    userId: session.user.id,
+    message: built.message,
+  });
   const { data: message, error: insertError } = await supabase
     .from("messages")
-    .insert({
-      organization_id: organizationId,
-      conversation_id: conversation.id,
-      direction: "out",
-      channel,
-      content,
-      meta,
-      template_id: storedTemplateId,
-      delivery_status: "queued",
-      sent_by_user_id: session.user.id,
-    })
+    .insert({ ...row, meta: row.meta as Json })
     .select("id")
     .single();
   if (insertError) return failFromError(insertError);
 
   const job = await requestJob(supabase, {
     organizationId,
-    kind: "send_message",
-    payload: { message_id: message.id },
-    dedupeKey: `send_message:${message.id}`,
+    ...sendMessageJob(message.id),
     actor: actorOf(context),
   });
   if (job.error) {

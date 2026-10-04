@@ -1,4 +1,5 @@
 import {
+  APP_LINKS,
   ConnectorError,
   END,
   type FlowDefinition,
@@ -464,6 +465,7 @@ async function failRun(
       kind: "error",
       title: "Flusso non completato",
       body: `Il flusso "${step.flowName}" si è fermato al passo "${step.stepId}": ${message}`,
+      link: APP_LINKS.flowRun(run.flow_id, run.id),
     });
   }
   return rows[0]!;

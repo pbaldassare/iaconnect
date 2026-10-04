@@ -1,9 +1,10 @@
 import {
+  APP_LINKS,
   type AiUsage,
   type Row,
   type ScrapeRecipe,
   ScrapeRecipeSchema,
-  creditsFor,
+  hasSpentTokens,
   runRecipe,
   validateRows,
 } from "@ia-connect/core";
@@ -11,14 +12,14 @@ import { type JobRow, consumeQuota, logAiCall, notify, quotaLeft } from "../db/r
 import { type Sql, iso, json } from "../db/sql.ts";
 import type { Deps, TraceResult } from "../deps.ts";
 import { errorMessage } from "../errors.ts";
-import { type JobResult, uuid } from "../jobs/types.ts";
-import { RejectedJob } from "../queue.ts";
+import { type JobResult, userPayload } from "../jobs/types.ts";
+import { FinalJobFailure, RejectedJob } from "../queue.ts";
 
 type RecipeRow = Row<"scrape_recipes">;
 export const MAX_REPAIRS = 3;
 
 async function loadRecipe(deps: Deps, job: JobRow): Promise<RecipeRow> {
-  const recipeId = uuid((job.payload as { recipe_id?: unknown }).recipe_id);
+  const recipeId = userPayload(job.kind === "scrape_trace" ? "scrape_trace" : "scrape_run", job).recipe_id;
   const rows = await deps.sql.query<RecipeRow>(
     "select * from ia_connect.scrape_recipes where id = $1 and organization_id = $2",
     [recipeId, job.organization_id],
@@ -146,14 +147,12 @@ async function trace(
       secrets: hasCredentials ? secrets : undefined,
       previous,
     });
-    await logAiCall(deps.sql, recipe.organization_id, purpose, result.usage, creditsFor(result.usage));
+    await logAiCall(deps.sql, recipe.organization_id, purpose, result.usage);
     return { ...result, recipe: ScrapeRecipeSchema.parse(result.recipe) };
   } catch (error) {
     // A tracing that fails after spending tokens (`AiOperationError`) is metered all the same.
     const usage = usageOf(error);
-    if (usage && usage.inputTokens + usage.outputTokens > 0) {
-      await logAiCall(deps.sql, recipe.organization_id, purpose, usage, creditsFor(usage));
-    }
+    if (usage && hasSpentTokens(usage)) await logAiCall(deps.sql, recipe.organization_id, purpose, usage);
     throw new Error(hideSecrets(errorMessage(error), secrets));
   } finally {
     await browser.close().catch(() => undefined);
@@ -270,6 +269,7 @@ export async function scrapeRun(deps: Deps, job: JobRow): Promise<JobResult> {
       kind: "error",
       title: "Lettura del sito interrotta",
       body: `La lettura "${recipe.name}" non funziona più dopo ${MAX_REPAIRS} tentativi di riparazione ed è stata fermata. Ultimo errore: ${failure.error ?? "sconosciuto"}`,
+      link: APP_LINKS.scrapeRecipe(recipe.id),
     });
   }
   return broken ? undefined : { rescheduleAt };
@@ -300,8 +300,11 @@ export async function scrapeTrace(deps: Deps, job: JobRow): Promise<JobResult> {
       kind: "error",
       title: "Tracciatura non riuscita",
       body: `Non è stato possibile tracciare "${recipe.name}": ${failure}`,
+      link: APP_LINKS.scrapeRecipe(recipe.id),
     });
-    return;
+    // The recipe page reads the job: `failed` + `last_error` is how it knows the trace did not
+    // produce a version. Not retried (a new trace costs AI credits) and already notified.
+    throw new FinalJobFailure(failure);
   }
   await saveVersion(deps.sql, recipe, traced.recipe, "Prima tracciatura");
   // A broken recipe traced again is back in service; a draft stays a draft until the customer activates it.
@@ -314,5 +317,6 @@ export async function scrapeTrace(deps: Deps, job: JobRow): Promise<JobResult> {
     kind: "info",
     title: "Tracciatura completata",
     body: `La lettura "${recipe.name}" è pronta: ${traced.sampleRows.length} righe di esempio trovate.`,
+    link: APP_LINKS.scrapeRecipe(recipe.id),
   });
 }

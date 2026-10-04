@@ -16,6 +16,7 @@ import { errorMessage } from "@/lib/action";
 import { eventTitle } from "@/lib/flows/describe";
 import { parseRequirements, planTemplateInstall } from "@/lib/flows/install";
 import { type FlowEnvironment, loadFlowEnvironment, loadFlowPermissions } from "@/lib/flows/server";
+import { INBOUND_TEST_EVENT_NOTE, isInboundMessageEvent, sampleEventPayload } from "@/lib/flows/test-event";
 import { type DiagramView, buildDiagram } from "@/lib/flows/view";
 import { formatDateTime, formatRelative, shortId } from "@/lib/format";
 import { connectorCategoryLabel, flowStatus, runStatus } from "@/lib/labels";
@@ -836,7 +837,11 @@ async function RunsTab({ context, flow }: { context: OrgContext; flow: Row<"flow
               label="Contenuto dell'evento (JSON)"
               htmlFor="payload"
               name="payload"
-              hint="I dati che il flusso legge con {{event.payload…}}. Usa dati di prova, non quelli di un cliente vero."
+              hint={`I dati che il flusso legge con {{event.payload…}}. Usa dati di prova, non quelli di un cliente vero.${
+                types.some(isInboundMessageEvent)
+                  ? ` Per un messaggio in arrivo serve "from" (il mittente). ${INBOUND_TEST_EVENT_NOTE}`
+                  : ""
+              }`}
             >
               <Textarea
                 id="payload"
@@ -844,9 +849,7 @@ async function RunsTab({ context, flow }: { context: OrgContext; flow: Row<"flow
                 rows={7}
                 spellCheck={false}
                 className="font-mono text-[12.5px]"
-                defaultValue={
-                  '{\n  "subject": "Richiesta di preventivo",\n  "text": "Buongiorno, vorrei un preventivo."\n}'
-                }
+                defaultValue={JSON.stringify(sampleEventPayload(types[types.length - 1]), null, 2)}
               />
             </Field>
             <div>

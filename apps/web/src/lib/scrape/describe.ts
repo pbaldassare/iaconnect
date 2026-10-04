@@ -71,3 +71,20 @@ const RUN_STATUS: Record<string, { label: string; tone: "ok" | "error" | "neutra
 export function scrapeRunStatus(value: string): { label: string; tone: "ok" | "error" | "neutral" } {
   return RUN_STATUS[value] ?? { label: value, tone: "neutral" };
 }
+
+export type TraceState = "tracing" | "failed" | "idle";
+
+/**
+ * Where the AI tracing of a recipe stands, from its `scrape_trace` jobs (any order).
+ * The worker closes a trace that produced no usable path as `failed` (with the reason in
+ * `last_error` and a notification); `done` means a new version was saved.
+ */
+export function traceState(
+  jobs: readonly { kind: string; status: string; created_at: string }[],
+): TraceState {
+  const traces = jobs
+    .filter((job) => job.kind === "scrape_trace")
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  if (traces.some((job) => job.status === "pending" || job.status === "running")) return "tracing";
+  return traces[0]?.status === "failed" ? "failed" : "idle";
+}

@@ -182,6 +182,57 @@ export function sanitizeConfig(
   return out;
 }
 
+/**
+ * Entries of `connections.config` that `connector.connect` does not produce: the worker
+ * (or the platform, after the row exists) writes them, and the worker reads them back.
+ * - `cursor`: where the last poll stopped (`poll_connection`). Without it the next poll
+ *   starts from scratch.
+ * - `pollIntervalMinutes`: per-connection polling interval, set by the assistance.
+ * - `statusCallbackUrl`: Twilio's delivery-status address (built from the webhook token).
+ */
+export const PLATFORM_CONFIG_KEYS = ["cursor", "pollIntervalMinutes", "statusCallbackUrl"] as const;
+
+/**
+ * The config to store when an existing connection is reconnected: what `connect` returned,
+ * plus the platform's own entries of the previous config. The polling cursor is kept only
+ * when the account is the same: on another account it would point nowhere.
+ */
+export function mergeReconnectConfig(
+  previous: unknown,
+  next: Record<string, unknown>,
+  options: { sameAccount: boolean },
+): Record<string, unknown> {
+  const before =
+    previous && typeof previous === "object" && !Array.isArray(previous)
+      ? (previous as Record<string, unknown>)
+      : {};
+  const out: Record<string, unknown> = { ...next };
+  for (const key of PLATFORM_CONFIG_KEYS) {
+    if (key in out || before[key] === undefined) continue;
+    if (key === "cursor" && !options.sameAccount) continue;
+    out[key] = before[key];
+  }
+  return out;
+}
+
+/**
+ * Environment variables handed to connectors by the web server (`ConnectorContext.env`).
+ * The worker passes every variable starting with GOOGLE_, MICROSOFT_, META_, WAWEBAPI_,
+ * WEBHOOK_ (`connectorEnv` in apps/worker/src/deps.ts): each name here must match that rule,
+ * and a test checks that every variable the connectors read is covered on both sides.
+ */
+export const CONNECTOR_ENV_KEYS = [
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "MICROSOFT_CLIENT_ID",
+  "MICROSOFT_CLIENT_SECRET",
+  "META_APP_ID",
+  "META_APP_SECRET",
+  "META_GRAPH_VERSION",
+  "WAWEBAPI_BASE_URL",
+  "WEBHOOK_PUBLIC_URL",
+] as const;
+
 /** Example request for a connection that receives signed JSON (webhook_inbound). */
 export function webhookExample(url: string): string {
   return [

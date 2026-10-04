@@ -20,7 +20,6 @@ import { parseRequirements, planTemplateInstall, sortTemplatesForSector } from "
 import {
   formatDuration,
   nextVersionNumber,
-  outputHighlights,
   parseDefinitionJson,
   sanitizeHistory,
   summarizeRuns,
@@ -492,19 +491,10 @@ describe("versions and runs", () => {
     expect(stats.get("b")).toEqual({ lastRunAt: "2026-09-01T10:00:00Z", runs7d: 0, failed7d: 0 });
   });
 
-  it("picks the message a simulated step would send", () => {
-    expect(outputHighlights({ to: "+39333", text: "Buongiorno", warnings: ["Consenso mancante"] })).toEqual([
-      { label: "Destinatario", value: "+39333" },
-      { label: "Testo", value: "Buongiorno" },
-      { label: "Attenzione", value: "Consenso mancante" },
-    ]);
-    expect(outputHighlights({ wouldSend: { to: "a@b.it", subject: "Ciao" } })).toEqual([
-      { label: "Destinatario", value: "a@b.it" },
-      { label: "Oggetto", value: "Ciao" },
-    ]);
-    expect(outputHighlights(null)).toEqual([]);
+  it("formats step durations", () => {
     expect(formatDuration(340)).toBe("340 ms");
     expect(formatDuration(1250)).toBe("1,3 s");
+    expect(formatDuration(null)).toBe("—");
   });
 
   it("trims the chat history coming from the browser", () => {

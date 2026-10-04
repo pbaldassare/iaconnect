@@ -75,3 +75,28 @@ export interface AiService {
 export function creditsFor(usage: Pick<AiUsage, "inputTokens" | "outputTokens">): number {
   return Math.max(1, Math.ceil((usage.inputTokens + usage.outputTokens) / 1000));
 }
+
+/** True when a call (even a failed one) consumed tokens and therefore must be recorded. */
+export function hasSpentTokens(usage: Pick<AiUsage, "inputTokens" | "outputTokens">): boolean {
+  return usage.inputTokens + usage.outputTokens > 0;
+}
+
+/**
+ * The `ai_calls` columns for one call, the same for the worker and the web app.
+ * `cost_micros` is a bigint column and the computed cost can be fractional: it is rounded here.
+ */
+export function aiCallColumns(usage: AiUsage): {
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_micros: number;
+  credits: number;
+} {
+  return {
+    model: usage.model,
+    input_tokens: Math.round(usage.inputTokens),
+    output_tokens: Math.round(usage.outputTokens),
+    cost_micros: Math.round(usage.costMicros),
+    credits: creditsFor(usage),
+  };
+}

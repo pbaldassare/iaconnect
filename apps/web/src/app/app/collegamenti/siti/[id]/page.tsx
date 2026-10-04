@@ -10,7 +10,7 @@ import { errorMessage } from "@/lib/action";
 import { formatDateTime, formatNumber, formatRelative } from "@/lib/format";
 import { isUuid } from "@/lib/org-selection";
 import { firstParam } from "@/lib/pagination";
-import { describeRecipe, intervalLabel, scrapeRunStatus } from "@/lib/scrape/describe";
+import { describeRecipe, intervalLabel, scrapeRunStatus, traceState } from "@/lib/scrape/describe";
 import { requireOrg } from "@/lib/session";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -74,10 +74,9 @@ export default async function RecipePage({
   ]);
 
   const pending = (jobs.data ?? []).filter((job) => job.status === "pending" || job.status === "running");
-  const tracing = pending.some((job) => job.kind === "scrape_trace");
-  const lastJob = (jobs.data ?? [])[0];
-  const traceFailed =
-    lastJob?.kind === "scrape_trace" && lastJob.status === "failed" && !recipe.active_version_id;
+  const trace = traceState(jobs.data ?? []);
+  const tracing = trace === "tracing";
+  const traceFailed = trace === "failed";
   const versionRows = versions.data ?? [];
   const runRows = runs.data ?? [];
 
@@ -112,8 +111,11 @@ export default async function RecipePage({
         ) : null}
         {traceFailed ? (
           <Notice tone="error" title="La tracciatura non è riuscita">
+            {recipe.active_version_id
+              ? "Resta in uso il percorso precedente. "
+              : "Non c'è ancora un percorso da eseguire. "}
             Controlla l'indirizzo e la descrizione, poi rigenera il percorso. Se il sito richiede l'accesso,
-            collega prima le credenziali.
+            collega prima le credenziali. Il motivo è nelle Notifiche.
           </Notice>
         ) : null}
         {recipe.status === "broken" ? (

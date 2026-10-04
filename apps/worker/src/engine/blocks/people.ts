@@ -1,4 +1,4 @@
-import { SendResultSchema, parseDuration } from "@ia-connect/core";
+import { APP_LINKS, SendResultSchema, parseDuration } from "@ia-connect/core";
 import { offersAction, runAction } from "../../connectors.ts";
 import {
   type ConversationRow,
@@ -43,6 +43,7 @@ export const requestApproval: Executor<{ summary: string; timeout: string }> = {
       kind: "approval",
       title: "Approvazione richiesta",
       body: params.summary,
+      link: APP_LINKS.approvals(),
     });
     return {
       type: "wait",
@@ -104,7 +105,7 @@ export async function handoffConversation(ctx: StepContext, note?: string): Prom
     kind: "handoff",
     title: "Conversazione da prendere in carico",
     body: note?.trim() || "Un contatto attende la risposta di una persona.",
-    link: conversation ? `/inbox/${conversation.id}` : undefined,
+    link: conversation ? APP_LINKS.conversation(conversation.id) : APP_LINKS.inbox(),
   });
   return conversation?.id ?? null;
 }

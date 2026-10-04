@@ -1,3 +1,4 @@
+import { USER_JOB_KINDS as CORE_USER_JOB_KINDS } from "@ia-connect/core";
 import { type JobRow, getOrganization } from "../db/repo.ts";
 import type { Deps } from "../deps.ts";
 import { RejectedJob } from "../queue.ts";
@@ -21,15 +22,8 @@ export const JOB_HANDLERS: Record<string, JobHandler> = {
   report,
 };
 
-/** Kinds a signed-in user may insert (see the RLS policy on scheduled_jobs). */
-export const USER_JOB_KINDS = new Set([
-  "send_message",
-  "approval_decided",
-  "simulate_flow",
-  "scrape_run",
-  "scrape_trace",
-  "verify_connection",
-]);
+/** Kinds a signed-in user may insert (RLS policy on scheduled_jobs; the list is shared with the web app). */
+export const USER_JOB_KINDS: ReadonlySet<string> = new Set(CORE_USER_JOB_KINDS);
 
 /** Kinds that must reach the engine even for a suspended organization, so its runs are closed. */
 const RUN_KINDS = new Set(["resume_run", "wait_timeout", "approval_decided"]);

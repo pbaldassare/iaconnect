@@ -119,13 +119,15 @@ export async function failJob(
     return;
   }
   const message = errorMessage(error);
-  if (error instanceof RejectedJob || job.attempts >= deps.config.maxAttempts) {
+  // Refused, or failed for good by its own handler: no retry, and no second notification.
+  const final = error instanceof RejectedJob || error instanceof FinalJobFailure;
+  if (final || job.attempts >= deps.config.maxAttempts) {
     await deps.sql.transaction(async (tx) => {
       await tx.query(
         "update ia_connect.scheduled_jobs set status = 'failed', locked_until = null, last_error = $2 where id = $1",
         [job.id, message],
       );
-      if (job.organization_id && !(error instanceof RejectedJob)) {
+      if (job.organization_id && !final) {
         await notify(tx, job.organization_id, {
           kind: "error",
           title: "Operazione non completata",
@@ -147,6 +149,18 @@ export class RejectedJob extends Error {
   constructor(message: string) {
     super(message);
     this.name = "RejectedJob";
+  }
+}
+
+/**
+ * A job that ran and failed in a way another attempt would not fix (a site that cannot be
+ * traced). The handler has already told the organization: the row becomes `failed` with the
+ * reason in `last_error`, which is what the web app reads.
+ */
+export class FinalJobFailure extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FinalJobFailure";
   }
 }
 

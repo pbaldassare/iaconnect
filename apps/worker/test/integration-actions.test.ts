@@ -767,11 +767,11 @@ describe("verify_connection", () => {
     }
     const notifications = await t.all("select kind, title, body, link from ia_connect.notifications");
     expect(notifications).toHaveLength(2);
-    expect(notifications[0]).toMatchObject({
-      kind: "connection",
-      title: "Collegamento scaduto",
-      link: "/collegamenti",
-    });
+    // The link is a real page of the web app: the connection's own page under /app.
+    expect(notifications.map((item) => item.link).sort()).toEqual(
+      [whatsapp.id, sms.id].map((id) => `/app/collegamenti/${id}`).sort(),
+    );
+    expect(notifications[0]).toMatchObject({ kind: "connection", title: "Collegamento scaduto" });
     // The daily check stays booked; the provider's own words and the tokens are stored nowhere.
     expect(await t.all("select 1 from ia_connect.scheduled_jobs where status = 'pending'")).toHaveLength(2);
     expect(await leaks(t, ["EAAG-revoked-token", "twilio-revoked-token", "Session has expired"])).toEqual([]);

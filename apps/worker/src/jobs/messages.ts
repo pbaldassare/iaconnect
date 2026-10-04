@@ -1,4 +1,4 @@
-import { type Channel, ConnectorError } from "@ia-connect/core";
+import { type Channel, ConnectorError, readOperatorMessageMeta } from "@ia-connect/core";
 import { offersAction } from "../connectors.ts";
 import {
   type JobRow,
@@ -14,7 +14,7 @@ import type { Deps } from "../deps.ts";
 import { addressOf } from "../engine/send.ts";
 import { StepError, errorMessage } from "../errors.ts";
 import { RejectedJob } from "../queue.ts";
-import { type JobResult, uuid } from "./types.ts";
+import { type JobResult, userPayload } from "./types.ts";
 
 const ACTIONS: Record<Channel, string> = {
   whatsapp: "sendText",
@@ -30,7 +30,7 @@ const ACTIONS: Record<Channel, string> = {
  */
 export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
   const organizationId = job.organization_id!;
-  const messageId = uuid((job.payload as { message_id?: unknown }).message_id);
+  const messageId = userPayload("send_message", job).message_id;
   const rows = await deps.sql.query<MessageRow & { meta: Record<string, unknown> }>(
     "select * from ia_connect.messages where id = $1 and organization_id = $2 and direction = 'out'",
     [messageId, organizationId],
@@ -54,6 +54,8 @@ export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
   }
 
   const channel = message.channel as Channel;
+  // What the inbox composer wrote: template variables in order, mail subject.
+  const written = readOperatorMessageMeta(message.meta);
   const conversation = await getConversation(deps.sql, organizationId, message.conversation_id);
   const contact = conversation
     ? await getContact(deps.sql, organizationId, conversation.contact_id)
@@ -85,8 +87,11 @@ export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
       const found = templates[0];
       if (!found || found.approval_status !== "approved")
         throw new StepError("Il modello scelto non è approvato.");
-      const variables = Array.isArray(message.meta?.variables) ? message.meta.variables.map(String) : [];
-      template = { name: found.external_name ?? found.name, language: found.language, variables };
+      template = {
+        name: found.external_name ?? found.name,
+        language: found.language,
+        variables: written.variables ?? [],
+      };
     }
     await deps.sql.query("update ia_connect.messages set meta = meta || $2::jsonb where id = $1", [
       message.id,
@@ -100,7 +105,7 @@ export async function sendMessage(deps: Deps, job: JobRow): Promise<JobResult> {
       conversation,
       to,
       text: message.content,
-      subject: typeof message.meta?.subject === "string" ? message.meta.subject : undefined,
+      subject: written.subject,
       template,
     });
     await deps.sql.query(

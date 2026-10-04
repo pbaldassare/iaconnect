@@ -282,17 +282,27 @@ una riga in `scheduled_jobs` e mostra l'esito quando il motore aggiorna i dati.
 const context = await requireOrg();
 const { error } = await requestJob(context.supabase, {
   organizationId: context.org.organization.id,
-  kind: "simulate_flow",
-  payload: { flow_version_id: versionId },
-  dedupeKey: `simulate:${versionId}:${Date.now()}`,   // facoltativa
+  ...simulateFlowJob(versionId),          // tipo, contenuto e chiave: lib/job-requests.ts
   actor: actorOf(context),
 });
 ```
 
 Tipi ammessi dalla RLS: `send_message`, `approval_decided` (ogni membro); `simulate_flow`,
-`scrape_run`, `scrape_trace`, `verify_connection` (chi gestisce). La forma del `payload` è
-quella letta dai gestori in `apps/worker/src/jobs/` (vedi `docs/moduli/worker.md`).
-`requestJob` scrive anche la riga di registro `job.<tipo>`.
+`scrape_run`, `scrape_trace`, `verify_connection` (chi gestisce). Ogni richiesta si costruisce
+con le funzioni di `lib/job-requests.ts`; la forma del contenuto è lo schema
+`USER_JOB_PAYLOADS` di `packages/core/src/jobs.ts`, lo stesso che i gestori del motore
+usano per leggerlo. `requestJob` scrive anche la riga di registro `job.<tipo>`.
+
+**Contratto con il motore.** Web e motore si parlano solo attraverso il database. Le forme
+condivise stanno in `packages/core` (`jobs.ts`: lavori e `meta` dei messaggi dell'operatore;
+`links.ts`: indirizzi delle notifiche; `aiCallColumns`: righe di `ai_calls`) e le funzioni pure
+che costruiscono ciò che il web scrive (`lib/job-requests.ts`, `lib/inbox/outgoing.ts`,
+`lib/flows/test-event.ts`, `mergeReconnectConfig`) sono importate dai test del motore
+(`apps/worker/test/web-contract.test.ts`), che le inseriscono passando dalla RLS e fanno
+lavorare i gestori veri. Lo stesso test scrive in `apps/web/test/fixtures/` i passi di
+un'esecuzione simulata e di una vera: `apps/web/test/contract.test.ts` li usa per provare
+`stepOutcome`. Se cambia l'esito di un blocco, il test del motore fallisce: si aggiorna il
+file con `npx vitest run apps/worker/test/web-contract.test.ts -u` e si guarda cosa dice il test del web.
 
 **Interfaccia.** Testi in italiano, con i nomi che usa il cliente (Collegamenti, Flussi,
 Trattative). Ogni campo ha un'etichetta; il fuoco è visibile; tutto si usa da tastiera.
@@ -408,7 +418,10 @@ altrimenti «Utente 1a2b3c4d»), `lib/feature-gate.ts`, `lib/deals/assignees.ts`
 3. inserisce la riga in `messages` con `direction = 'out'`, `delivery_status = 'queued'`,
    `sent_by_user_id`;
 4. chiede il lavoro `send_message` con `{ message_id }` (`requestJob`, chiave
-   `send_message:<id>`); se la richiesta fallisce il messaggio diventa `failed` con il motivo;
+   `send_message:<id>`); se la richiesta fallisce il messaggio diventa `failed` con il motivo.
+   La riga del messaggio è costruita da `lib/inbox/outgoing.ts` (`buildTemplateMessage`,
+   `buildFreeMessage`, `outgoingMessageRow`); la forma di `meta` è `OperatorMessageMetaSchema`
+   in `packages/core`;
 5. se la conversazione era dell'automazione passa a chi ha scritto (una persona che
    risponde non deve incrociarsi con l'IA) e torna aperta.
 
@@ -565,8 +578,17 @@ Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
   browser e viene ridotta (`sanitizeHistory`); «Salva come bozza» ricontrolla lo schema.
 - **Simulazione**: lavoro `simulate_flow`; la scheda legge `flow_runs` con
   `mode = 'simulation'` e i loro passi e si aggiorna da sola finché il lavoro è in coda.
+  Per ogni passo `stepOutcome` (`lib/flows/outcome.ts`) dice in una frase cosa sarebbe
+  successo, con i dettagli del blocco (destinatario e testo, contatto e trattativa che
+  verrebbero creati, dati per il gestionale…) e gli avvisi sui rifiuti; il JSON completo
+  resta sotto.
 - **Evento di prova**: riga in `events` (`manual.test` o il tipo del trigger) con
-  `dedupe_key = manual:<uuid>` e voce di registro `flow.test_event`. Su un flusso attivo
+  `dedupe_key = manual:<uuid>` e voce di registro `flow.test_event` (`lib/flows/test-event.ts`).
+  Se il trigger è limitato a un collegamento l'evento porta quel `connection_id`, altrimenti
+  non corrisponderebbe mai. Per i messaggi in arrivo (mail, WhatsApp, SMS, social) il
+  contenuto deve avere `from`: senza mittente il motore ignora l'evento, quindi l'azione lo
+  rifiuta prima; il contenuto proposto è un esempio adatto al tipo. Un messaggio in arrivo
+  di prova crea davvero contatto, conversazione e messaggio. Su un flusso attivo
   l'esecuzione è vera: la pagina lo dice.
 - Funzioni: `flow_editor` spento → il cliente vede soltanto; `flow_assistant` spento →
   niente assistente; `scraping` spento → niente nuove letture. L'assistenza non è
@@ -597,8 +619,8 @@ da tipi, build e test delle funzioni pure.
   servizio reale; l'intero giro OAuth con app vere;
 - l'assistente con una chiave Anthropic vera; tempi di risposta dentro i limiti di durata
   delle azioni server dell'hosting;
-- la forma reale di `flow_run_steps.output` in simulazione: la pagina mette in evidenza i
-  campi che riconosce (`to`, `text`, `subject`, `warnings`…) e mostra sempre il JSON completo;
+- come si vedono a schermo i passi di un'esecuzione (la lettura degli esiti è provata sui
+  passi scritti dal motore, il componente `RunSteps` no);
 - l'aspetto con dati veri, nei due temi e a 380 px.
 
 Limiti noti e ripieghi:
@@ -609,4 +631,8 @@ Limiti noti e ripieghi:
   toglierli).
 - Cambiare pagina Facebook richiede una nuova autorizzazione (vedi OAuth).
 - I conteggi dell'elenco dei flussi leggono le ultime 1000 esecuzioni reali.
-- Gli avvisi del motore sui collegamenti puntano a `/collegamenti` (manca `/app`).
+- Un ricollegamento conserva in `connections.config` ciò che scrive il motore (`cursor`,
+  `pollIntervalMinutes`, `statusCallbackUrl`); il cursore solo se l'account è lo stesso. Web
+  e motore scrivono la stessa colonna senza blocco: un ricollegamento fatto proprio mentre il
+  motore salva un cursore può rimettere quello di un attimo prima (gli eventi non si
+  duplicano, hanno una `dedupe_key`).

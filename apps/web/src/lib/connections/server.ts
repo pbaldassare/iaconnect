@@ -1,7 +1,9 @@
 import "server-only";
 import {
+  CONNECTOR_ENV_KEYS,
   connectionWebhookUrl,
   defaultConnectionName,
+  mergeReconnectConfig,
   sanitizeConfig,
   webhookBaseUrl,
 } from "@/lib/connections/catalog";
@@ -21,22 +23,10 @@ import type { ConnectResult, Connector, ConnectorContext, Json, Row } from "@ia-
  * `revealableSecrets`) and never written to `connections.config`.
  */
 
-const ENV_KEYS = [
-  "GOOGLE_CLIENT_ID",
-  "GOOGLE_CLIENT_SECRET",
-  "MICROSOFT_CLIENT_ID",
-  "MICROSOFT_CLIENT_SECRET",
-  "META_APP_ID",
-  "META_APP_SECRET",
-  "META_GRAPH_VERSION",
-  "WAWEBAPI_BASE_URL",
-  "WEBHOOK_PUBLIC_URL",
-] as const;
-
 /** Platform settings handed to connectors: only the variables they are documented to read. */
 export function connectorEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = {};
-  for (const key of ENV_KEYS) env[key] = process.env[key];
+  for (const key of CONNECTOR_ENV_KEYS) env[key] = process.env[key];
   return env;
 }
 
@@ -187,10 +177,15 @@ export async function saveConnection(
         // Nothing to clean up, or the old credentials no longer work.
       }
     }
+    // `connect` knows nothing about what the worker keeps in the config (the polling cursor…):
+    // replacing the whole column would make the next poll start from scratch.
+    const sameAccount =
+      !result.externalAccountId || result.externalAccountId === existing.external_account_id;
+    const merged = mergeReconnectConfig(existing.config, config, { sameAccount }) as { [key: string]: Json };
     const { data, error } = await context.supabase
       .from("connections")
       .update({
-        config,
+        config: merged,
         external_account_id: result.externalAccountId ?? existing.external_account_id,
         status,
         last_error: lastError,
@@ -241,7 +236,13 @@ export async function saveConnection(
   if (webhookUrl && connector.key === "sms_twilio" && !asRecord(connection.config).statusCallbackUrl) {
     const { data } = await context.supabase
       .from("connections")
-      .update({ config: { ...config, statusCallbackUrl: webhookUrl } })
+      // From the stored row, not from `config`: on a reconnect the row also holds the worker's entries.
+      .update({
+        config: {
+          ...(asRecord(connection.config) as { [key: string]: Json }),
+          statusCallbackUrl: webhookUrl,
+        },
+      })
       .eq("id", connection.id)
       .eq("organization_id", orgId)
       .select("*")

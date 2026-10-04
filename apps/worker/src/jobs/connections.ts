@@ -1,11 +1,11 @@
-import { ConnectorError, type HealthStatus, NormalizedEventInputSchema } from "@ia-connect/core";
+import { APP_LINKS, ConnectorError, type HealthStatus, NormalizedEventInputSchema } from "@ia-connect/core";
 import { connectorContext } from "../connectors.ts";
 import { type JobRow, getConnection, notify } from "../db/repo.ts";
 import { iso, json } from "../db/sql.ts";
 import type { Deps } from "../deps.ts";
 import { errorMessage } from "../errors.ts";
 import { RejectedJob, scheduleJob } from "../queue.ts";
-import { type JobResult, uuid } from "./types.ts";
+import { type JobResult, userPayload, uuid } from "./types.ts";
 
 /** Polls one connection, stores the cursor, turns what it found into events, and books the next poll. */
 export async function pollConnection(deps: Deps, job: JobRow): Promise<JobResult> {
@@ -72,7 +72,7 @@ export async function pollConnection(deps: Deps, job: JobRow): Promise<JobResult
 
 /** Health check: decides `connections.status` and tells the organization when access is lost. */
 export async function verifyConnection(deps: Deps, job: JobRow): Promise<JobResult> {
-  const connectionId = uuid((job.payload as { connection_id?: unknown }).connection_id);
+  const connectionId = userPayload("verify_connection", job).connection_id;
   const connection = await getConnection(deps.sql, job.organization_id!, connectionId);
   if (!connection) throw new RejectedJob("connection not found in the job's organization");
   const recurring = job.dedupe_key === `verify:${connection.id}`;
@@ -104,7 +104,7 @@ export async function verifyConnection(deps: Deps, job: JobRow): Promise<JobResu
         health.status === "expired"
           ? `Il collegamento "${connection.name}" è scaduto: va ricollegato dalla pagina Collegamenti.`
           : `Il collegamento "${connection.name}" non risponde${health.message ? `: ${health.message}` : "."}`,
-      link: "/collegamenti",
+      link: APP_LINKS.connection(connection.id),
     });
   }
   return { rescheduleAt };

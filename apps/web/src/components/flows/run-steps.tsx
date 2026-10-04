@@ -1,13 +1,14 @@
 /**
  * RunSteps — the steps of one run (live or simulated), in order: status, exit
- * taken, what the step produced (e.g. the message that would be sent), error,
- * duration and AI cost.
+ * taken, what the step did or would have done (`stepOutcome`, one reading per
+ * block type), error, duration and AI cost.
  *
  *   <RunSteps steps={rows of flow_run_steps} />
  */
 import { AiBadge, StatusPill } from "@/components/ui/badge";
 import { blockTitle, outletLabel } from "@/lib/flows/describe";
-import { formatDuration, outputHighlights, stepStatus } from "@/lib/flows/runs";
+import { stepOutcome } from "@/lib/flows/outcome";
+import { formatDuration, stepStatus } from "@/lib/flows/runs";
 import { formatMicros } from "@/lib/format";
 import { OUTLETS, type Outlet, getBlock } from "@ia-connect/core";
 
@@ -47,7 +48,7 @@ export function RunSteps({ steps }: { steps: RunStepRow[] }) {
   return (
     <ol className="grid gap-2">
       {steps.map((step, index) => {
-        const highlights = outputHighlights(step.output);
+        const outcome = stepOutcome(step);
         const usesAi = getBlock(step.block)?.usesAi ?? false;
         const outlet = OUTLETS.includes(step.outlet as Outlet)
           ? outletLabel(step.outlet as Outlet)
@@ -66,15 +67,26 @@ export function RunSteps({ steps }: { steps: RunStepRow[] }) {
               <span>durata {formatDuration(step.duration_ms)}</span>
               {step.ai_cost_micros > 0 ? <span>costo IA {formatMicros(step.ai_cost_micros)}</span> : null}
             </p>
-            {highlights.length > 0 ? (
+            {outcome.headline ? <p className="mt-2 text-sm font-medium">{outcome.headline}</p> : null}
+            {outcome.details.length > 0 ? (
               <dl className="mt-2 grid gap-1 text-sm">
-                {highlights.map((item) => (
+                {outcome.details.map((item) => (
                   <div key={`${item.label}:${item.value}`} className="grid gap-x-2 sm:grid-cols-[8rem_1fr]">
                     <dt className="text-muted">{item.label}</dt>
                     <dd className="whitespace-pre-wrap break-words">{item.value}</dd>
                   </div>
                 ))}
               </dl>
+            ) : null}
+            {outcome.warnings.length > 0 ? (
+              <ul className="mt-2 grid gap-1 rounded-md bg-warn-soft px-2 py-1.5 text-[13px] text-ink">
+                {outcome.warnings.map((warning) => (
+                  <li key={warning}>
+                    <span className="font-semibold text-warn">Attenzione: </span>
+                    {warning}
+                  </li>
+                ))}
+              </ul>
             ) : null}
             {step.error ? (
               <p role="alert" className="mt-2 rounded-md bg-danger-soft px-2 py-1 text-[13px] text-ink">
