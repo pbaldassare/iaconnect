@@ -25,7 +25,7 @@ export function MoveForm({
         <label htmlFor={id} className="sr-only">
           Sposta «{dealTitle}» in un'altra fase
         </label>
-        <Select id={id} name="stage_id" defaultValue="" required className="h-8 min-w-0 flex-1 text-[13px]">
+        <Select id={id} name="stage_id" defaultValue="" required dense className="min-w-0 flex-1">
           <option value="" disabled>
             Sposta in…
           </option>

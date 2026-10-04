@@ -67,7 +67,6 @@ export function RunSteps({
               <span className="font-semibold">{blockTitle(step.block)}</span>
               {usesAi ? <AiBadge /> : null}
               <StatusPill {...stepStatus(step.status)} />
-              <span className="font-mono text-[11px] text-muted">{step.step_id}</span>
             </div>
             <p className="mt-1 flex flex-wrap gap-x-3 text-[13px] text-muted">
               {outlet && step.outlet !== "next" ? <span>uscita: {outlet}</span> : null}

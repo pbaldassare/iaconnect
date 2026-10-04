@@ -44,13 +44,17 @@ export function buildDiagram(
   const grouped = groupIssues(issues);
   const nodes = buildFlowGraph(definition);
   const toView = (issue: FlowIssue): DiagramIssue => ({ level: issue.level, text: issueText(issue) });
+  const withSteps: DescribeNames = {
+    ...names,
+    steps: new Map(nodes.map((node) => [node.id, node.position])),
+  };
   return {
     trigger: describeTrigger(definition.trigger, names),
     steps: nodes.map((node, index) => ({
       id: node.id,
       position: node.position,
       title: node.title,
-      summary: describeStep(definition.steps[index]!, names),
+      summary: describeStep(definition.steps[index]!, withSteps),
       usesAi: node.usesAi,
       known: node.known,
       reachable: node.reachable,

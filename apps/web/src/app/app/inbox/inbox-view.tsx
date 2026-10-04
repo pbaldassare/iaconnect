@@ -137,7 +137,7 @@ export async function InboxView({ params, selectedId }: { params: Params; select
   return (
     <>
       <AutoRefresh seconds={10} />
-      <div className={cn(selectedId ? "sr-only lg:not-sr-only" : "")}>
+      <div className={cn(selectedId ? "sr-only min-[1100px]:not-sr-only" : "")}>
         <PageHeader
           title="Inbox"
           description="Le conversazioni di tutti i canali in un posto solo. Quelle che prendi in carico escono dall'automazione."
@@ -158,8 +158,11 @@ export async function InboxView({ params, selectedId }: { params: Params; select
         </Notice>
       ) : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)] lg:items-start">
-        <section aria-label="Conversazioni" className={cn("min-w-0", selectedId ? "hidden lg:block" : "")}>
+      <div className="grid gap-4 min-[1100px]:grid-cols-[minmax(0,340px)_minmax(0,1fr)] min-[1100px]:items-start">
+        <section
+          aria-label="Conversazioni"
+          className={cn("min-w-0", selectedId ? "hidden min-[1100px]:block" : "")}
+        >
           <Tabs
             label="Filtra le conversazioni"
             className="mb-3"
@@ -170,9 +173,9 @@ export async function InboxView({ params, selectedId }: { params: Params; select
               count: view === "da-gestire" || view === "non-lette" ? counts[view] : undefined,
             }))}
           />
-          <form action="/app/inbox" method="get" className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <form action="/app/inbox" method="get" className="mb-3 flex flex-wrap gap-2">
             {filter.view !== "tutte" ? <input type="hidden" name="vista" value={filter.view} /> : null}
-            <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+            <div className="min-w-[13rem] flex-1">
               <label htmlFor="inbox-q" className="sr-only">
                 Cerca per nome, telefono o mail
               </label>
@@ -184,7 +187,7 @@ export async function InboxView({ params, selectedId }: { params: Params; select
                 placeholder="Cerca per nome, telefono o mail"
               />
             </div>
-            <div>
+            <div className="min-w-[9.5rem] flex-1 sm:flex-none">
               <label htmlFor="inbox-channel" className="sr-only">
                 Canale
               </label>
@@ -199,7 +202,7 @@ export async function InboxView({ params, selectedId }: { params: Params; select
             </div>
             <button
               type="submit"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold hover:bg-surface-2"
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border border-line-strong bg-surface px-3 text-sm font-semibold hover:bg-surface-2"
             >
               <Icon name="search" className="size-4" />
               Cerca
@@ -308,7 +311,10 @@ export async function InboxView({ params, selectedId }: { params: Params; select
           ) : null}
         </section>
 
-        <section aria-label="Conversazione" className={cn("min-w-0", selectedId ? "" : "hidden lg:block")}>
+        <section
+          aria-label="Conversazione"
+          className={cn("min-w-0", selectedId ? "" : "hidden min-[1100px]:block")}
+        >
           {selectedId ? (
             <Thread context={context} conversationId={selectedId} backHref={listHref()} />
           ) : (
@@ -401,7 +407,7 @@ async function Thread({
   const status = conversationStatus(conversation.status);
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px] xl:items-start">
+    <div className="grid gap-4 min-[1480px]:grid-cols-[minmax(0,1fr)_260px] min-[1480px]:items-start">
       <MarkRead
         unread={conversation.unread_count}
         action={markConversationRead.bind(null, conversation.id)}
@@ -410,7 +416,7 @@ async function Thread({
         <header className="border-b border-line p-3 sm:p-4">
           <Link
             href={backHref}
-            className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink lg:hidden"
+            className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink min-[1100px]:hidden"
           >
             <Icon name="chevron-left" className="size-4" />
             Tutte le conversazioni

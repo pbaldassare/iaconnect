@@ -1,7 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icons";
 import { Table, Td, Th } from "@/components/ui/table";
-import { actorTypeLabel, changedFields, describeAuditAction, isSupportRow } from "@/lib/audit-labels";
+import {
+  actorTypeLabel,
+  auditFieldLabel,
+  changedFields,
+  describeAuditAction,
+  isSupportRow,
+} from "@/lib/audit-labels";
 import { formatDateTime, shortId } from "@/lib/format";
 import type { Row } from "@ia-connect/core";
 
@@ -52,12 +58,18 @@ export function AuditTable({
                 </Td>
               ) : null}
               <Td>
-                <span className="block">{actorTypeLabel(row.actor_type)}</span>
-                {row.actor_id ? (
-                  <span className="font-mono text-[12px] text-muted">
-                    {row.actor_id === currentUserId ? "tu" : shortId(row.actor_id)}
-                  </span>
-                ) : null}
+                {row.actor_id && row.actor_id === currentUserId ? (
+                  "Tu"
+                ) : (
+                  <>
+                    <span className="block">{actorTypeLabel(row.actor_type)}</span>
+                    {row.actor_id ? (
+                      <span className="text-[13px] text-muted" title={row.actor_id}>
+                        codice <span className="font-mono text-[12px]">{shortId(row.actor_id)}</span>
+                      </span>
+                    ) : null}
+                  </>
+                )}
               </Td>
               <Td>
                 <span className="block font-medium">{describeAuditAction(row.action)}</span>
@@ -71,10 +83,13 @@ export function AuditTable({
               <Td muted className="text-[13px]">
                 {changed.length > 0 ? (
                   <>
-                    Campi modificati: <span className="font-mono text-[12px]">{changed.join(", ")}</span>
+                    {changed.length === 1 ? "Modificato: " : "Modificati: "}
+                    <span className="text-ink">{changed.map(auditFieldLabel).join(", ")}</span>
                   </>
                 ) : row.entity_id ? (
-                  <span className="font-mono text-[12px]">{shortId(row.entity_id)}</span>
+                  <span title={row.entity_id}>
+                    Codice <span className="font-mono text-[12px]">{shortId(row.entity_id)}</span>
+                  </span>
                 ) : (
                   "—"
                 )}

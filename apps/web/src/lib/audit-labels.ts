@@ -94,3 +94,60 @@ export function changedFields(data: unknown): string[] {
   const changed = (data as Record<string, unknown>).changed;
   return Array.isArray(changed) ? changed.filter((v): v is string => typeof v === "string") : [];
 }
+
+/** Italian names of the columns that show up in `data.changed`. */
+const FIELD: Record<string, string> = {
+  name: "nome",
+  full_name: "nome",
+  title: "titolo",
+  description: "descrizione",
+  status: "stato",
+  stage_id: "fase",
+  value_cents: "valore",
+  assignee_user_id: "assegnatario",
+  assignee_type: "chi la gestisce",
+  next_action: "prossima azione",
+  next_action_at: "data della prossima azione",
+  closed_at: "data di chiusura",
+  custom_fields: "campi personalizzati",
+  phones: "telefoni",
+  emails: "mail",
+  consents: "consensi",
+  memory: "memoria",
+  role: "ruolo",
+  permissions: "permessi",
+  brand: "marchio",
+  ai_settings: "assistente IA",
+  deal_fields: "campi delle trattative",
+  enabled: "attivazione",
+  plan_id: "piano",
+  reseller_id: "rivenditore",
+  sector: "settore",
+  config: "configurazione",
+  last_checked_at: "ultimo controllo",
+  last_error: "ultimo errore",
+  active_version_id: "versione in uso",
+  trigger_event: "evento di partenza",
+  definition: "schema",
+  content: "testo",
+  variables: "valori da riempire",
+  approval_status: "stato di approvazione",
+  external_name: "nome su WhatsApp",
+  position: "ordine",
+  kind: "tipo",
+  key: "chiave",
+  schedule: "frequenza",
+  recipe: "percorso",
+  goal: "obiettivo",
+  url: "indirizzo",
+  decided_at: "data della decisione",
+  decided_by: "chi ha deciso",
+  ended_at: "fine",
+  email: "mail",
+  expires_at: "scadenza",
+};
+
+/** "stage_id" → "fase"; a column without a name of its own loses `_id` and underscores. */
+export function auditFieldLabel(column: string): string {
+  return FIELD[column] ?? column.replace(/_id$/, "").replace(/_/g, " ");
+}

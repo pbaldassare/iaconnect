@@ -67,7 +67,6 @@ export function FlowDiagram({ view }: { view: DiagramView }) {
                 {step.usesAi ? <AiBadge /> : null}
                 {!step.known ? <Badge tone="error">Blocco sconosciuto</Badge> : null}
                 {!step.reachable ? <Badge tone="warning">Mai raggiunto</Badge> : null}
-                <span className="font-mono text-[11px] text-muted">{step.id}</span>
               </div>
               <p className="mt-1 break-words text-sm text-ink/90">{step.summary}</p>
               {step.exits.length > 0 ? (

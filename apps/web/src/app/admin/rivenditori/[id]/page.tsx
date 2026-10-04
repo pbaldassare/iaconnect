@@ -43,7 +43,6 @@ export default async function ResellerPage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         title={r.name}
-        eyebrow="Rivenditore"
         description={`${organizations.count ?? 0} aziende · identificativo ${r.slug}`}
         back={{ href: "/admin/rivenditori", label: "Rivenditori" }}
         actions={

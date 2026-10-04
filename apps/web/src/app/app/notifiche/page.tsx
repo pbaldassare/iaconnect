@@ -130,7 +130,7 @@ export default async function NotificationsPage({
                     {link ? (
                       <Link
                         href={link}
-                        className="inline-flex h-8 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-[13px] font-semibold hover:bg-surface-2"
+                        className="inline-flex h-8 max-md:h-10 items-center gap-1 rounded-lg border border-line-strong bg-surface px-3 text-[13px] font-semibold hover:bg-surface-2"
                       >
                         Apri
                         <Icon name="chevron-right" className="size-4" />
@@ -140,7 +140,7 @@ export default async function NotificationsPage({
                       <form action={markNotificationRead.bind(null, notification.id)}>
                         <button
                           type="submit"
-                          className="inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-semibold hover:bg-surface-2"
+                          className="inline-flex h-8 max-md:h-10 items-center rounded-lg px-3 text-[13px] font-semibold hover:bg-surface-2"
                         >
                           Segna come letta<span className="sr-only">: {notification.title}</span>
                         </button>

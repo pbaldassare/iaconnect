@@ -8,7 +8,7 @@ import { cn } from "@/lib/cn";
  *   <Button variant="danger" size="sm">Elimina</Button>
  *   <ButtonLink href="/app/flussi" variant="secondary" icon="plus">Nuovo flusso</ButtonLink>
  *
- * Variants: primary (one per view), secondary, ghost, danger. Sizes: md (40px), sm (32px).
+ * Variants: primary (one per view), secondary, ghost, danger. Sizes: md (40px), sm (32px; 40px on phones).
  * Inside an <ActionForm> prefer <SubmitButton> (components/ui/form), which shows the pending state.
  */
 import Link from "next/link";
@@ -26,7 +26,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 const SIZES: Record<ButtonSize, string> = {
   md: "h-10 px-4 text-sm",
-  sm: "h-8 px-3 text-[13px]",
+  // 40px on phones, where the button is pressed with a finger.
+  sm: "h-8 px-3 text-[13px] max-md:h-10",
 };
 
 export function buttonClass(variant: ButtonVariant = "primary", size: ButtonSize = "md", className?: string) {

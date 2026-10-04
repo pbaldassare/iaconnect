@@ -240,8 +240,11 @@ export default async function HomePage() {
           ) : (
             <ul className="divide-y divide-line">
               {activeFlows.slice(0, 6).map((f) => (
-                <li key={f.id} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                  <Link href={`/app/flussi/${f.id}`} className="min-w-0 truncate font-medium hover:underline">
+                <li
+                  key={f.id}
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 py-2 first:pt-0 last:pb-0"
+                >
+                  <Link href={`/app/flussi/${f.id}`} className="min-w-0 font-medium hover:underline">
                     {f.name}
                   </Link>
                   <span className="shrink-0 font-mono text-[12px] text-muted">

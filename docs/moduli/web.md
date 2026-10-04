@@ -67,7 +67,7 @@ apps/web
       catalogo/ piani/ rivenditori/ rivenditori/[id]/ monitoraggio/ registro/
   src/components
     ui/                   kit di componenti (vedi sotto)
-    shell/                guscio: barra laterale, cambio azienda, tema, azioni di sessione
+    shell/                guscio: barra laterale, cambio azienda, tema, azioni di sessione (vedi «Guscio»)
     audit-table.tsx, usage-meters.tsx, placeholder.tsx
   src/lib                 sessione, client Supabase, formattazione, regole pure
   test/                   test Vitest delle funzioni pure
@@ -143,8 +143,16 @@ ogni pagina e ogni azione chiama da sé `requireOrg()` / `requireStaff()` ecc. (
 ## Aspetto
 
 Token in `src/app/globals.css`, gli stessi di `site/index.html`: sfondo carta con griglia,
-verde per l'accento, **ambra solo per ciò che è IA**. Tema chiaro e scuro seguono il sistema;
-`<html data-theme="light|dark">` li forza (pulsante «Tema chiaro / scuro», cookie `theme`).
+verde per l'accento, **ambra solo per ciò che è IA**.
+
+**Tema.** Tre scelte: Chiaro, Scuro, Automatico (segue il dispositivo). Il controllo
+(`components/shell/theme-control.tsx`) è in fondo alla barra laterale e, nelle pagine fuori
+dalle due aree (`PlainPage`: accedi, registrati, password…), sotto il riquadro. La scelta va nel
+cookie `theme` (`light` / `dark`; Automatico lo cancella): il layout radice lo legge e scrive
+`<html data-theme>`, quindi la pagina arriva già nel tema giusto, senza script in linea e senza
+lampo. `color-scheme` segue il tema (campi, barre di scorrimento, date). Regole in `lib/theme.ts`.
+Chi aggiunge un colore lo aggiunge nei **tre** blocchi di `globals.css` (chiaro, scuro di sistema,
+scuro forzato) e controlla il contrasto nei due temi.
 
 Si usano solo le classi Tailwind mappate sui token, mai colori scritti a mano:
 
@@ -165,6 +173,39 @@ Marchio: `org_settings.brand` e `resellers.brand` hanno `{ name, logoUrl, accent
 nome e logo; il colore tinge soltanto il riquadro del marchio, non l'accento dell'interfaccia
 (così il contrasto resta garantito nei due temi).
 
+## Guscio
+
+`AppShell` (`components/shell/app-shell.tsx`, server) è usato solo dai layout di `/app` e
+`/admin`, che si comportano allo stesso modo. Prepara i pezzi e li passa a `ShellFrame`
+(`shell-frame.tsx`, client), che tiene solo lo stato aperto/chiuso, la voce attiva e la tastiera.
+
+| Larghezza | Cosa si vede |
+| --- | --- |
+| da 768 px | barra laterale **a sinistra**, in due stati: aperta (248 px: icona + nome, marchio in alto, tema, utente ed «Esci» in basso) o ridotta a sole icone (64 px, con `title` e nome accessibile). Il pulsante in cima alla barra la apre e la chiude |
+| sotto 768 px | barra in alto con il pulsante del menu **a sinistra**, il marchio e la campanella; il menu è un pannello che entra da sinistra |
+
+- **Stato della barra**: cookie `sidebar` (`expanded` / `collapsed`), letto dal server e scritto in
+  `data-sidebar` sul contenitore: nessun lampo al caricamento. Senza cookie vale `auto`: ridotta
+  tra 768 e 1100 px, aperta sopra. È tutto CSS (`.shell` in `globals.css`); le classi `rail:…`
+  valgono dentro la barra quando è ridotta (container query), così ogni riga decide da sé cosa
+  nascondere. Il nome di una riga resta sempre nel DOM (`rail:sr-only`).
+- **Pannello sul telefono**: si chiude alla navigazione, con Esc, toccando lo sfondo; il fuoco
+  resta dentro mentre è aperto e torna al pulsante alla chiusura; la pagina sotto non scorre;
+  `aria-expanded` e `aria-controls` sul pulsante. Chiuso è `visibility: hidden`, quindi non si
+  raggiunge con Tab.
+- **Notifiche**: `notifications={{ href, unread }}`. Da 768 px sono una riga della barra con il
+  numero; sul telefono la campanella in alto a destra.
+- **Cambio azienda** (`orgSwitcher`): in cima alla barra; con la barra ridotta diventa un pulsante
+  che la apre e porta il fuoco sull'elenco.
+- **Fasce** (`banner`): demo e accesso in assistenza stanno sopra il contenuto, fisse in alto da
+  768 px. La fascia demo è una riga sola con «Registrati» ed «Esci dalla demo».
+- Le classi condivise tra server e client (`SHELL_ITEM`, `SHELL_LABEL`) stanno in
+  `shell/styles.ts`: un modulo client non può esportare costanti verso un componente server.
+- Il contenuto ha larghezza massima 1180 px. L'Inbox mette elenco e conversazione affiancati da
+  1100 px; la scheda del contatto passa a fianco da 1480 px.
+- Icona del sito: `app/icon.svg` e `app/favicon.ico` (copia di `site/assets/favicon.svg`: se
+  cambia lì, va rifatta qui). `BrandMark` è lo stesso disegno, usato quando non c'è un marchio.
+
 ## Kit di componenti
 
 Ogni file in `src/components/ui/` comincia con un commento che mostra come usarlo.
@@ -172,18 +213,19 @@ Si importa dal file o da `@/components/ui`.
 
 | Componente | Import | Note |
 | --- | --- | --- |
-| `Button`, `ButtonLink`, `buttonClass` | `@/components/ui/button` | varianti `primary`, `secondary`, `ghost`, `danger`; misure `md`, `sm`; `icon` |
-| `Input`, `Textarea`, `Select`, `Checkbox`, `Switch` | `@/components/ui/input` | `Checkbox` e `Switch` hanno la propria etichetta |
+| `Button`, `ButtonLink`, `buttonClass` | `@/components/ui/button` | varianti `primary`, `secondary`, `ghost`, `danger`; misure `md`, `sm` (32 px, 40 sul telefono); `icon` |
+| `Input`, `Textarea`, `Select`, `Checkbox`, `Switch` | `@/components/ui/input` | `Checkbox` e `Switch` hanno la propria etichetta. `dense` su `Input` e `Select`: 32 px (40 sul telefono), per le righe modificabili. Larghi quanto il contenitore, a meno di una classe `w-…` |
 | `Field` | `@/components/ui/field` | etichetta + aiuto + errore; `htmlFor` = `id` del campo; `name` prende l'errore dall'azione |
 | `ActionForm`, `SubmitButton`, `useActionResult` | `@/components/ui/form` | modulo legato a un'azione server (`useActionState`) |
 | `FormMessage`, `Notice` | `@/components/ui/form-message` | messaggi in pagina (niente toast); toni `ok`, `warning`, `error`, `neutral`, `ai` |
 | `Card`, `CardHeader`, `Panel` | `@/components/ui/card` | superfici; non annidare le `Card` |
-| `Table`, `Th`, `Td` | `@/components/ui/table` | scorre in orizzontale sotto `minWidth`; `caption` obbligatoria |
+| `Table`, `Th`, `Td` | `@/components/ui/table` | scorre in orizzontale sotto `minWidth`; `caption` obbligatoria; la prima colonna non scende sotto 160 px, le celle `mono` (date, numeri) non vanno a capo |
 | `Badge`, `StatusPill`, `AiBadge` | `@/components/ui/badge` | `<StatusPill {...connectionStatus(x)} />` |
 | `Tabs` | `@/components/ui/tabs` | schede come link (parametro o sotto-pagina) |
 | `Dialog` | `@/components/ui/dialog` | `<dialog>` nativo, disegna il proprio pulsante |
 | `EmptyState` | `@/components/ui/empty-state` | dice cosa conterrà l'elenco e cosa fare per primo |
-| `PageHeader` | `@/components/ui/page-header` | l'unico `<h1>` della pagina; `actions`, `back`, `eyebrow` |
+| `PageHeader` | `@/components/ui/page-header` | l'unico `<h1>` della pagina; `actions`, `back`, `context` (una nota accanto al link «indietro», sulla stessa riga: niente etichetta sopra il titolo) |
+| `ThemeControl`, `ThemeSwitch` | `@/components/shell/theme-control`, `theme-switch` | scelta del tema; `ThemeSwitch` è la versione server che legge il cookie |
 | `Pagination` | `@/components/ui/pagination` | con `parsePage`, `pageWindow`, `withParams` di `@/lib/pagination` |
 | `Meter` | `@/components/ui/meter` | valore su limite; `UsageMeters` in `@/components/usage-meters` |
 | `Skeleton`, `PageSkeleton` | `@/components/ui/skeleton` | per i `loading.tsx` |
@@ -318,8 +360,17 @@ un'esecuzione simulata e di una vera: `apps/web/test/contract.test.ts` li usa pe
 `stepOutcome`. Se cambia l'esito di un blocco, il test del motore fallisce: si aggiorna il
 file con `npx vitest run apps/worker/test/web-contract.test.ts -u` e si guarda cosa dice il test del web.
 
+**Classi che si scontrano.** `cn` unisce le classi, non le risolve: passare `h-8` a un
+componente che ha già `h-10` non funziona (vince l'ordine del CSS). Si usano le proprietà
+previste (`size`, `dense`) o si aggiunge una variante al componente.
+
+**Nomi leggibili.** Nessun nome tecnico a schermo: i campi dei flussi passano da
+`lib/flows/field-labels.ts` (`subject` → «oggetto», `[passo 1: nome]`), le colonne del registro
+da `auditFieldLabel` in `lib/audit-labels.ts` (`stage_id` → «fase»). Un campo nuovo si aggiunge lì.
+
 **Interfaccia.** Testi in italiano, con i nomi che usa il cliente (Collegamenti, Flussi,
 Trattative). Ogni campo ha un'etichetta; il fuoco è visibile; tutto si usa da tastiera.
+Sul telefono i bersagli da toccare sono alti almeno 40 px.
 Deve reggere a 380 px: le griglie di pagina partono a una colonna e le tabelle stanno in
 `Table`, che scorre da sola senza allargare la pagina. Un elenco vuoto è un `EmptyState`
 che dice cosa fare.
@@ -873,7 +924,7 @@ lettura. Serve a mostrarla a un potenziale cliente e a guardare ogni pagina con 
 | Contesto | `lib/session.ts`, `lib/demo/context.ts` | `requireOrg()` e `requireOrgManager()` restituiscono un titolare finto, l'azienda «Agenzia Demo» (assicurazioni, piano Pro), `demo: true` e come `supabase` il client in memoria |
 | Client in memoria | `lib/demo/client.ts` | imita il costruttore di query di supabase-js sopra dei vettori di righe |
 | Dati | `lib/demo/fixtures.ts` | le righe, generate rispetto ad adesso |
-| Interfaccia | `components/shell/demo-banner.tsx`, `app-shell.tsx` | fascia «Stai guardando una demo…» con «Registrati» ed «Esci dalla demo»; nel menu compare «Demo» al posto della mail e non c'è «Cambia password» |
+| Interfaccia | `components/shell/demo-banner.tsx`, `app-shell.tsx` | fascia di una riga «Demo · dati di esempio, modifiche disattivate» con «Registrati» ed «Esci dalla demo»; nella barra compare «Demo» al posto della mail e non c'è «Cambia password» |
 
 Una sessione vera vince sempre: se il middleware trova un utente entrato ignora il cookie e lo
 cancella. Fuori da `/app` il cookie non conta: `/admin`, `/api/**` e le pagine dell'account
@@ -950,3 +1001,19 @@ lettura, dati invariati.
 - Un indirizzo che il middleware non vede (finisce in `.png`, `.svg`…) potrebbe ricevere
   l'intestazione `x-ia-demo` dal browser: otterrebbe solo i dati di esempio, mai quelli veri.
 - I dati di esempio entrano nel pacchetto del server (pochi KiB compressi).
+
+## Verifica dell'interfaccia (2026-10-04, guscio e tema)
+
+Guardato in Chrome (Playwright con il Chrome di sistema) sulla build di produzione, entrando da
+`/demo`: guscio aperto, ridotto e pannello del telefono; ogni pagina dell'area cliente a 800 px
+(tema chiaro), a 380 px e a 1280 px (tema scuro) con controllo automatico di contrasto del testo
+(nessun testo attivo sotto 4,5:1 nei due temi), scorrimento orizzontale (nessuno a 380 px) e
+altezza dei bersagli; `/accedi`, `/registrati`, `/password-dimenticata`, `/privacy` nei due temi.
+Provati da tastiera: apertura e chiusura della barra, cookie e resa dal server, pannello (Esc,
+sfondo, fuoco intrappolato e restituito, blocco dello scorrimento), scelta del tema.
+
+**Non visto**: l'area admin vera e le pagine che chiedono un accesso (`/in-attesa`,
+`/completa-registrazione`, `/imposta-password`, `/nessuna-azienda`). Il guscio admin (voci, numero
+delle richieste, cambio azienda, fascia dell'assistenza, registro con la colonna «Azienda») è
+stato guardato con una pagina di prova locale, poi tolta; le pagine admin usano gli stessi
+componenti del kit ma non sono state aperte con dati.

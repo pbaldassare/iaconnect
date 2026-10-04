@@ -99,7 +99,8 @@ export default async function StagesSettingsPage() {
                               defaultValue={stage.name}
                               maxLength={60}
                               required
-                              className="h-8 w-44 text-[13px]"
+                              dense
+                              className="w-44"
                             />
                             <label htmlFor={`kind-${stage.id}`} className="sr-only">
                               Tipo della fase {stage.name}
@@ -108,7 +109,8 @@ export default async function StagesSettingsPage() {
                               id={`kind-${stage.id}`}
                               name="kind"
                               defaultValue={stage.kind}
-                              className="h-8 w-auto text-[13px]"
+                              dense
+                              className="w-auto"
                             >
                               {STAGE_KINDS.map((kind) => (
                                 <option key={kind} value={kind}>

@@ -129,8 +129,8 @@ describe("simulation view, on step rows written by the worker", () => {
 
   it("shows AI steps with what the model produced", () => {
     expect(sim("extract").details).toEqual([
-      { label: "name", value: "Mario Rossi" },
-      { label: "phone", value: "3331234567" },
+      { label: "nome", value: "Mario Rossi" },
+      { label: "telefono", value: "3331234567" },
     ]);
     expect(detail(sim("classify"), "Categoria")).toBe("preventivo");
     expect(detail(sim("summarize"), "Riassunto")).toBe("Riassunto di prova.");

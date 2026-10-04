@@ -84,7 +84,6 @@ export default async function RecipePage({
     <>
       <PageHeader
         title={recipe.name}
-        eyebrow="Siti e portali"
         description={recipe.target_url}
         back={{ href: "/app/collegamenti/siti", label: "Siti e portali" }}
         actions={<StatusPill {...recipeStatus(recipe.status)} />}
@@ -176,7 +175,7 @@ export default async function RecipePage({
                   Rigenera il percorso
                 </SubmitButton>
               </ActionForm>
-              <RefreshButton />
+              <RefreshButton size="md" />
             </div>
           ) : null}
         </Card>

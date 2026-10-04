@@ -16,19 +16,34 @@ import { cn } from "@/lib/cn";
 import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const CONTROL =
-  "w-full rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink placeholder:text-muted/70 " +
+  "rounded-lg border border-line-strong bg-surface px-3 text-sm text-ink placeholder:text-muted/85 " +
   "aria-[invalid=true]:border-danger disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-muted";
+
+/** Full width unless the caller sets a width (class names are joined, not merged). */
+function control(className: string | undefined, ...parts: (string | false)[]) {
+  return cn(CONTROL, !/(^|\s)w-/.test(className ?? "") && "w-full", ...parts, className);
+}
 
 function describedBy(id: string | undefined, explicit: string | undefined) {
   if (explicit) return explicit;
   return id ? `${id}-hint ${id}-error` : undefined;
 }
 
-export function Input({ className, id, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+const DENSE = "h-8 text-[13px] max-md:h-10";
+
+export function Input({
+  className,
+  id,
+  dense,
+  ...rest
+}: InputHTMLAttributes<HTMLInputElement> & {
+  /** 32px high (40px on phones), for rows of an editable list. */
+  dense?: boolean;
+}) {
   return (
     <input
       id={id}
-      className={cn(CONTROL, "h-10", className)}
+      className={control(className, dense ? DENSE : "h-10")}
       {...rest}
       aria-describedby={describedBy(id, rest["aria-describedby"])}
     />
@@ -40,18 +55,27 @@ export function Textarea({ className, id, rows = 4, ...rest }: TextareaHTMLAttri
     <textarea
       id={id}
       rows={rows}
-      className={cn(CONTROL, "py-2 leading-relaxed", className)}
+      className={control(className, "py-2 leading-relaxed")}
       {...rest}
       aria-describedby={describedBy(id, rest["aria-describedby"])}
     />
   );
 }
 
-export function Select({ className, id, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({
+  className,
+  id,
+  children,
+  dense,
+  ...rest
+}: SelectHTMLAttributes<HTMLSelectElement> & {
+  /** 32px high (40px on phones), next to a `size="sm"` button. */
+  dense?: boolean;
+}) {
   return (
     <select
       id={id}
-      className={cn(CONTROL, "h-10 pr-8", className)}
+      className={control(className, dense ? DENSE : "h-10", "pr-9")}
       {...rest}
       aria-describedby={describedBy(id, rest["aria-describedby"])}
     >

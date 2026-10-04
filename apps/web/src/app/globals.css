@@ -29,6 +29,7 @@
   --danger-soft: #fbe4e1;
   --on-danger: #ffffff;
   --shadow: 0 1px 2px rgba(13, 31, 27, 0.05), 0 12px 32px -12px rgba(13, 31, 27, 0.18);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2353655f' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: light;
 }
 
@@ -55,6 +56,7 @@
     --danger-soft: #3d1512;
     --on-danger: #2b0906;
     --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239bafa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
     color-scheme: dark;
   }
 }
@@ -81,6 +83,7 @@
   --danger-soft: #3d1512;
   --on-danger: #2b0906;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239bafa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9.5 6 6 6-6'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -113,6 +116,13 @@
   --radius-panel: 12px;
 }
 
+/* `rail:` applies inside the shell sidebar while it is the narrow icon-only rail. */
+@custom-variant rail {
+  @container shell-sidebar (max-width: 120px) {
+    @slot;
+  }
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -137,6 +147,43 @@
 
   ::selection {
     background: var(--accent-soft);
+    color: var(--ink);
+  }
+
+  html {
+    scrollbar-color: var(--line-strong) transparent;
+    accent-color: var(--accent);
+    caret-color: var(--accent);
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  a {
+    text-underline-offset: 0.2em;
+    text-decoration-thickness: 1px;
+    text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  }
+
+  a:hover {
+    text-decoration-color: currentColor;
+  }
+
+  @media (max-width: 767.98px) {
+    summary {
+      padding-block: 0.6rem;
+    }
+  }
+
+  select {
+    appearance: none;
+    background-image: var(--chevron);
+    background-repeat: no-repeat;
+    background-position: right 0.6rem center;
+    background-size: 1rem;
   }
 
   dialog::backdrop {
@@ -148,6 +195,91 @@
   select,
   [role="tab"] {
     cursor: pointer;
+  }
+}
+
+/*
+ * Shell (components/shell): left sidebar with two widths from 768px, off-canvas drawer below.
+ * `data-sidebar` on the frame is "expanded", "collapsed" or "auto" (no stored choice: a rail
+ * between 768 and 1100px, expanded above). Everything is CSS, so the server-rendered page is
+ * already in the right state.
+ */
+.shell {
+  --sidebar-w: 248px;
+  min-height: 100dvh;
+}
+
+.shell-sidebar {
+  container: shell-sidebar / inline-size;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+
+@media (min-width: 768px) {
+  .shell {
+    display: grid;
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+    transition: grid-template-columns 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .shell[data-sidebar="collapsed"] {
+    --sidebar-w: 64px;
+  }
+
+  .shell-sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow: hidden;
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1099.98px) {
+  .shell[data-sidebar="auto"] {
+    --sidebar-w: 64px;
+  }
+}
+
+@media (max-width: 767.98px) {
+  .shell-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(18rem, 86vw);
+    visibility: hidden;
+    transform: translateX(-100%);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s linear 0.2s;
+  }
+
+  .shell[data-drawer="open"] .shell-sidebar {
+    visibility: visible;
+    transform: none;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), visibility 0s;
+  }
+}
+
+.shell-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(13, 31, 27, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-out, visibility 0s linear 0.2s;
+}
+
+.shell[data-drawer="open"] .shell-backdrop {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease-out, visibility 0s;
+}
+
+@media (min-width: 768px) {
+  .shell-backdrop {
+    display: none;
   }
 }
 

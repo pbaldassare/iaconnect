@@ -95,7 +95,7 @@ export default async function FlowsPage() {
         ) : null}
         {rows.length > 0 ? (
           <>
-            <Table caption="Flussi dell'azienda" minWidth={860}>
+            <Table caption="Flussi dell'azienda" minWidth={940}>
               <thead>
                 <tr>
                   <Th>Nome</Th>
@@ -112,7 +112,7 @@ export default async function FlowsPage() {
                   const stat = stats.get(flow.id);
                   return (
                     <tr key={flow.id}>
-                      <Td>
+                      <Td className="min-w-64">
                         <Link
                           href={`/app/flussi/${flow.id}`}
                           className="font-semibold underline-offset-2 hover:underline"

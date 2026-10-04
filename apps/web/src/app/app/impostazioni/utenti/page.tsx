@@ -101,7 +101,8 @@ export default async function UsersSettingsPage() {
                             id={`role-${member.id}`}
                             name="role"
                             defaultValue={member.role}
-                            className="h-8 w-auto text-[13px]"
+                            dense
+                            className="w-auto"
                           >
                             <option value="org_owner">Titolare</option>
                             <option value="org_member">Collaboratore</option>

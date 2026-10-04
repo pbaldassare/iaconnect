@@ -6,7 +6,8 @@
  *     actions={<ButtonLink href="…" icon="plus">Nuovo collegamento</ButtonLink>}
  *     back={{ href: "/admin/aziende", label: "Aziende" }} />
  *
- * `eyebrow` is a short mono label above the title (e.g. the section name on a detail page).
+ * `context` is a short note next to the back link (the flow a run belongs to, the kind of
+ * connection): it sits on the same line, so a detail page does not spend a row on it.
  */
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -16,36 +17,37 @@ export function PageHeader({
   title,
   description,
   actions,
-  eyebrow,
+  context,
   back,
 }: {
   title: ReactNode;
   description?: ReactNode;
   actions?: ReactNode;
-  eyebrow?: ReactNode;
+  context?: ReactNode;
   back?: { href: string; label: string };
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+    <header className="mb-5 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        {back ? (
-          <Link
-            href={back.href}
-            className="mb-2 inline-flex items-center gap-1 text-sm font-medium text-muted hover:text-ink"
-          >
-            <Icon name="chevron-left" className="size-4" />
-            {back.label}
-          </Link>
-        ) : null}
-        {eyebrow ? (
-          <p className="mb-1 font-mono text-[11px] font-medium uppercase tracking-[0.14em] text-accent">
-            {eyebrow}
+        {back || context ? (
+          <p className="mb-1 flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] text-muted">
+            {back ? (
+              <Link
+                href={back.href}
+                className="-ml-1 inline-flex h-7 items-center gap-0.5 rounded-md pr-1.5 font-semibold hover:text-ink max-md:h-10"
+              >
+                <Icon name="chevron-left" className="size-4" />
+                {back.label}
+              </Link>
+            ) : null}
+            {back && context ? <span aria-hidden>/</span> : null}
+            {context ? <span className="min-w-0 truncate">{context}</span> : null}
           </p>
         ) : null}
-        <h1 className="font-display text-2xl font-extrabold leading-tight tracking-tight sm:text-[28px]">
+        <h1 className="break-words font-display text-[24px] font-extrabold leading-[1.15] tracking-tight sm:text-[26px]">
           {title}
         </h1>
-        {description ? <p className="mt-1.5 max-w-[70ch] text-muted">{description}</p> : null}
+        {description ? <p className="mt-1 max-w-[70ch] text-sm text-muted">{description}</p> : null}
       </div>
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </header>

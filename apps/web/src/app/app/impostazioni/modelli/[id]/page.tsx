@@ -32,7 +32,6 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     <>
       <PageHeader
         title={template.name}
-        eyebrow="Modello di messaggio"
         back={{
           href: withParams("/app/impostazioni/modelli", {
             canale: template.channel === "whatsapp" ? null : template.channel,

@@ -6,7 +6,6 @@ import { Icon } from "@/components/ui/icons";
 import { getBranding } from "@/lib/branding";
 import { CUSTOMER_NAV } from "@/lib/nav";
 import { requireOrg } from "@/lib/session";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
 /**
@@ -23,7 +22,6 @@ export default async function CustomerLayout({ children }: { children: ReactNode
       .eq("organization_id", org.organization.id)
       .is("read_at", null),
   ]);
-  const unreadCount = unread.count ?? 0;
   const inSupport = org.mode === "support";
 
   return (
@@ -35,7 +33,7 @@ export default async function CustomerLayout({ children }: { children: ReactNode
       userEmail={demo ? "Demo" : session.user.email}
       demo={demo}
       crossLink={session.isStaff ? { href: "/admin", label: "Area admin" } : undefined}
-      top={
+      orgSwitcher={
         organizations.length > 1 || (inSupport && organizations.length > 0) ? (
           <OrgSwitcher
             organizations={organizations.map((o) => ({ id: o.id, name: o.name }))}
@@ -43,36 +41,17 @@ export default async function CustomerLayout({ children }: { children: ReactNode
           />
         ) : null
       }
-      headerExtra={
-        <Link
-          href="/app/notifiche"
-          className="relative flex size-10 items-center justify-center rounded-lg text-ink hover:bg-surface-2"
-        >
-          <Icon
-            name="bell"
-            label={unreadCount > 0 ? `Notifiche: ${unreadCount} da leggere` : "Notifiche: nessuna da leggere"}
-            className="size-5"
-          />
-          {unreadCount > 0 ? (
-            <span
-              aria-hidden
-              className="absolute right-1 top-1 min-w-4 rounded-full bg-accent px-1 text-center font-mono text-[10px] font-semibold leading-4 text-on-accent"
-            >
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          ) : null}
-        </Link>
-      }
+      notifications={{ href: "/app/notifiche", unread: unread.count ?? 0 }}
       banner={
         demo ? (
           <DemoBanner />
         ) : inSupport ? (
           <aside
             aria-label="Accesso in assistenza"
-            className="z-30 flex md:sticky md:top-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 bg-ink px-4 py-2.5 text-bg sm:px-6 md:px-8"
+            className="z-20 flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 bg-ink px-4 py-2 text-bg sm:px-6 md:sticky md:top-0 md:px-8"
           >
-            <p className="flex min-w-0 items-center gap-2 text-sm font-semibold">
-              <Icon name="shield" className="size-4" />
+            <p className="flex min-w-0 items-start gap-2 text-[13px] font-semibold leading-snug">
+              <Icon name="shield" className="mt-0.5 size-4" />
               <span>
                 Stai lavorando come assistenza su <span className="underline">{org.organization.name}</span>.
                 Ogni azione viene registrata ed è visibile al cliente.
@@ -81,7 +60,7 @@ export default async function CustomerLayout({ children }: { children: ReactNode
             <form action={endSupportSession}>
               <button
                 type="submit"
-                className="h-8 rounded-lg border border-bg/40 px-3 text-[13px] font-semibold hover:bg-bg/15 focus-visible:outline-bg"
+                className="h-8 rounded-lg border border-bg/40 px-3 text-[13px] font-semibold hover:bg-bg/15 focus-visible:outline-bg max-md:h-10"
               >
                 Esci dall'assistenza
               </button>

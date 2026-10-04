@@ -194,7 +194,8 @@ async function main() {
     const marker = ERROR_MARKERS.find((text) => html.includes(text));
     if (marker) fail(`${path} contains "${marker}"`);
     if (!/noindex/.test(response.headers.get("x-robots-tag") ?? "")) fail(`${path} is not marked noindex`);
-    if (!html.includes("Stai guardando una demo")) fail(`${path} has no demo banner`);
+    // The strip of components/shell/demo-banner.tsx.
+    if (!html.includes('aria-label="Demo"')) fail(`${path} has no demo banner`);
     console.log(`  ok    ${listed.has(path) ? "" : "(link) "}${path}`);
     for (const match of html.matchAll(/href="(\/app[^"#]*)"/g)) {
       const href = match[1].replaceAll("&amp;", "&");
