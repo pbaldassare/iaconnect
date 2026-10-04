@@ -1,0 +1,8 @@
+# Minimal configuration: only what the edge functions need. Run `supabase init`/`link`
+# settings can be added here; nothing in this file contains secrets.
+
+[functions.webhook]
+# Providers (Meta, Twilio, Stripe, customer sites) cannot send a Supabase JWT:
+# every request is authenticated by its own signature inside the function.
+verify_jwt = false
+import_map = "./functions/deno.json"

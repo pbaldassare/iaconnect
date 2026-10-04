@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Same identity as the landing page (site/index.html): paper
+ * background with a faint grid, deep green accent, amber for anything AI.
+ * Components only use the Tailwind names mapped below (bg-surface, text-muted,
+ * border-line, text-accent, bg-ai-soft…), never raw hex values.
+ * Theme: follows the system, unless <html data-theme="light|dark"> overrides it.
+ */
+:root {
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --surface-2: #eaf0ed;
+  --ink: #0d1f1b;
+  --muted: #53655f;
+  --line: #d6e0db;
+  --line-strong: #b9c9c2;
+  --grid: rgba(13, 31, 27, 0.045);
+  --accent: #06724f;
+  --accent-strong: #04573c;
+  --on-accent: #ffffff;
+  --accent-soft: #ddf3ea;
+  --ai: #855000;
+  --ai-soft: #fbebcb;
+  --warn: #6b5900;
+  --warn-soft: #f5efc2;
+  --danger: #b3261e;
+  --danger-strong: #8f1d17;
+  --danger-soft: #fbe4e1;
+  --on-danger: #ffffff;
+  --shadow: 0 1px 2px rgba(13, 31, 27, 0.05), 0 12px 32px -12px rgba(13, 31, 27, 0.18);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1513;
+    --surface: #12201d;
+    --surface-2: #182a26;
+    --ink: #e9f1ee;
+    --muted: #9bafa8;
+    --line: #253934;
+    --line-strong: #37524b;
+    --grid: rgba(233, 241, 238, 0.04);
+    --accent: #3fd6a2;
+    --accent-strong: #6be4bb;
+    --on-accent: #06231a;
+    --accent-soft: #143a2f;
+    --ai: #f2b544;
+    --ai-soft: #3a2c10;
+    --warn: #e3d25a;
+    --warn-soft: #33300f;
+    --danger: #ff8a80;
+    --danger-strong: #ffb1aa;
+    --danger-soft: #3d1512;
+    --on-danger: #2b0906;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b1513;
+  --surface: #12201d;
+  --surface-2: #182a26;
+  --ink: #e9f1ee;
+  --muted: #9bafa8;
+  --line: #253934;
+  --line-strong: #37524b;
+  --grid: rgba(233, 241, 238, 0.04);
+  --accent: #3fd6a2;
+  --accent-strong: #6be4bb;
+  --on-accent: #06231a;
+  --accent-soft: #143a2f;
+  --ai: #f2b544;
+  --ai-soft: #3a2c10;
+  --warn: #e3d25a;
+  --warn-soft: #33300f;
+  --danger: #ff8a80;
+  --danger-strong: #ffb1aa;
+  --danger-soft: #3d1512;
+  --on-danger: #2b0906;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 16px 40px -16px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-ai: var(--ai);
+  --color-ai-soft: var(--ai-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-strong: var(--danger-strong);
+  --color-danger-soft: var(--danger-soft);
+  --color-on-danger: var(--on-danger);
+
+  --font-display: var(--font-bricolage), "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-figtree), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --shadow-panel: var(--shadow);
+  --radius-panel: 12px;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 44px 44px;
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  dialog::backdrop {
+    background: rgba(13, 31, 27, 0.45);
+  }
+
+  button:not(:disabled),
+  summary,
+  select,
+  [role="tab"] {
+    cursor: pointer;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,405 @@
+[
+  {
+    "step_id": "extract",
+    "block": "ai.extract",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "text": "RC auto",
+      "fields": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "phone",
+          "type": "string",
+          "required": false
+        }
+      ]
+    },
+    "output": {
+      "data": {
+        "name": "Mario Rossi",
+        "phone": "3331234567"
+      },
+      "missing": []
+    },
+    "error": null,
+    "ai_cost_micros": 4200,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "classify",
+    "block": "ai.classify",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "text": "RC auto",
+      "categories": [
+        {
+          "key": "preventivo"
+        },
+        {
+          "key": "altro"
+        }
+      ]
+    },
+    "output": {
+      "category": "preventivo"
+    },
+    "error": null,
+    "ai_cost_micros": 4200,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "summarize",
+    "block": "ai.summarize",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "text": "RC auto",
+      "maxWords": 80
+    },
+    "output": {
+      "summary": "Riassunto di prova."
+    },
+    "error": null,
+    "ai_cost_micros": 4200,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "contact",
+    "block": "contact.upsert",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "name": "Maria Rossi",
+      "email": "maria.rossi@example.com",
+      "phone": "+393331234567",
+      "fields": {
+        "prodotto": "RC auto"
+      },
+      "consent": {
+        "source": "Richiesta di preventivo",
+        "channel": "whatsapp"
+      }
+    },
+    "output": {
+      "created": true,
+      "contactId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "cond",
+    "block": "logic.condition",
+    "status": "succeeded",
+    "outlet": "onTrue",
+    "input": {
+      "left": "RC auto",
+      "right": "auto",
+      "operator": "contains"
+    },
+    "output": {
+      "result": true
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "choose",
+    "block": "logic.switch",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "cases": [
+        {
+          "goto": "wa_template",
+          "equals": "preventivo"
+        }
+      ],
+      "value": "preventivo"
+    },
+    "output": {
+      "_goto": "wa_template",
+      "matched": "preventivo"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "wa_template",
+    "block": "whatsapp.send_template",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "template": "preventivo",
+      "variables": {
+        "1": "Maria Rossi",
+        "2": "RC auto"
+      }
+    },
+    "output": {
+      "text": "Buongiorno Maria Rossi, ecco il preventivo RC auto.",
+      "messageId": "00000000-0000-4000-8000-000000000000",
+      "externalId": "ext-1"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "post",
+    "block": "social.publish_post",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "text": "Nuova offerta RC auto",
+      "mediaUrl": "https://www.example.com/offerta.jpg"
+    },
+    "output": {
+      "postId": "ext-2"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "deal",
+    "block": "deal.create",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "stage": "new",
+      "title": "Preventivo RC auto · Maria Rossi",
+      "value": "1.250,50",
+      "fields": {
+        "targa": "AB123CD"
+      },
+      "nextAction": "Richiamare"
+    },
+    "output": {
+      "dealId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "stage",
+    "block": "deal.update_stage",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "stage": "quote_sent"
+    },
+    "output": {
+      "stage": "quote_sent",
+      "dealId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "crm_read",
+    "block": "crm.read",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "query": {
+        "phone": "+393331234567"
+      },
+      "resource": "customers"
+    },
+    "output": {
+      "count": 1,
+      "records": [
+        {
+          "status": "spedito",
+          "resource": "customers"
+        }
+      ]
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "crm_write",
+    "block": "crm.write",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "data": {
+        "name": "Maria Rossi",
+        "product": "RC auto"
+      },
+      "resource": "quotes"
+    },
+    "output": {
+      "id": "crm-1"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "find",
+    "block": "contact.find_matching",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "limit": 50,
+      "rules": [
+        {
+          "field": "zona",
+          "operator": "exists"
+        }
+      ]
+    },
+    "output": {
+      "count": 0,
+      "contacts": []
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "each",
+    "block": "logic.for_each",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "items": [
+        "AB123CD",
+        "EF456GH"
+      ],
+      "limit": 100,
+      "payload": {},
+      "emitEvent": "custom.targa"
+    },
+    "output": {
+      "total": 2,
+      "emitted": 2
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "slots",
+    "block": "calendar.find_slots",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "max": 2,
+      "days": 7,
+      "durationMinutes": 30
+    },
+    "output": {
+      "slots": [
+        {
+          "end": "2026-10-06T09:30:00Z",
+          "start": "2026-10-06T09:00:00Z"
+        }
+      ]
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "event",
+    "block": "calendar.create_event",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "end": "2026-10-06T09:30:00Z",
+      "start": "2026-10-06T09:00:00Z",
+      "title": "Appuntamento con Maria Rossi",
+      "location": "In agenzia"
+    },
+    "output": {
+      "appointmentId": "00000000-0000-4000-8000-000000000000",
+      "externalEventId": "cal-1"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "pay",
+    "block": "payment.request",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "amount": "120,50",
+      "description": "Acconto polizza"
+    },
+    "output": {
+      "url": "https://pay.example/1",
+      "paymentRequestId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "sign",
+    "block": "signature.request",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "title": "Contratto RC auto",
+      "documentUrl": "https://www.example.com/contratto.pdf"
+    },
+    "output": {
+      "url": "https://sign.example/1",
+      "signatureRequestId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "notify",
+    "block": "human.notify_owner",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "via": "whatsapp",
+      "message": "Nuovo preventivo da seguire"
+    },
+    "output": {
+      "via": "whatsapp",
+      "sent": true,
+      "notificationId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  },
+  {
+    "step_id": "handoff",
+    "block": "human.handoff",
+    "status": "succeeded",
+    "outlet": "next",
+    "input": {
+      "note": "Il cliente vuole parlare con una persona"
+    },
+    "output": {
+      "conversationId": "00000000-0000-4000-8000-000000000000"
+    },
+    "error": null,
+    "ai_cost_micros": 0,
+    "duration_ms": 0
+  }
+]
