@@ -112,6 +112,22 @@ Questa impostazione prevale su quella della pagina. Per aggiungere in futuro un 
 ripetuto il comando con l'elenco completo; per tornare alla pagina:
 `alter role authenticator reset pgrst.db_schemas;`.
 
+## Azienda pilota: Pititto Assicurazioni (2026-10-06)
+
+Nel database l'azienda "Azienda di prova" è diventata **Pititto Assicurazioni** (titolare
+`pititto@assicurapp.it`). Configurato:
+
+- collegamento "Gestionale Assicurapp (scadenze)" (`crm_rest`, indirizzo `https://api.assicurapp.it`,
+  lettura una volta al giorno di `quotes` e `policies` da `/api/policies/expiring_api`, token cifrato
+  nel Vault; alla prima lettura segnala tutte le righe presenti);
+- fase "In scadenza" e campi extra delle trattative (targa, scadenza, compagnia, premio, tipo…);
+- i due flussi "Polizza in scadenza" e "Copertura altrui in scadenza" installati come bozze, con i
+  quattro modelli WhatsApp in bozza.
+
+Per attivarli servono: il worker acceso, un collegamento WhatsApp (Meta) attivo, l'approvazione dei
+modelli WhatsApp su Meta e poi "Attiva" dalla pagina del flusso. Il token API è stato incollato in
+chat il 2026-10-06: va rigenerato dal gestionale e aggiornato nel collegamento.
+
 ## Decisioni da confermare
 
 Prese in autonomia e segnate come provvisorie in [decisioni/](decisioni/): Next.js, code su tabelle
