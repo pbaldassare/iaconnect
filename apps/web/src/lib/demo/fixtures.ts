@@ -142,6 +142,8 @@ export function buildDemoData(now: Date = new Date()): DemoData {
         { key: "scadenza_polizza", label: "Scadenza polizza", type: "date" },
         { key: "veicoli", label: "Numero di veicoli", type: "number" },
         { key: "cliente_storico", label: "Cliente storico", type: "boolean" },
+        { key: "scadenza", label: "Scadenza", type: "date" },
+        { key: "targa", label: "Targa", type: "text" },
       ],
       ...stamp(ago(96)),
     },
@@ -1828,11 +1830,14 @@ export function buildDemoData(now: Date = new Date()): DemoData {
       next_action: "Preparare la proposta con la visura",
       next_action_at: noon(2),
       assignee_user_id: DEMO_COLLEAGUE_ID,
+      custom_fields: { scadenza: ahead(3).slice(0, 10) },
     }),
     deal(5, 5, "Preventivo RC moto · Sara Colombini", STAGE.new, 28000, {
       created_at: ago(0, 3),
       next_action: "Chiamare: il numero non è su WhatsApp",
       next_action_at: noon(0),
+      // Her current cover expires soon: it shows up in the "Scadenze" view of the list.
+      custom_fields: { targa: "EK482RT", scadenza: ahead(12).slice(0, 10) },
     }),
     deal(6, 6, "Polizza vita ventennale · Giorgio Pellegrino", STAGE.new, 120000, {
       created_at: ago(9),

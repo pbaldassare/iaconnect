@@ -16,7 +16,12 @@ import {
   outletLabel,
 } from "../src/lib/flows/describe";
 import { buildFlowGraph, visibleExits } from "../src/lib/flows/graph";
-import { parseRequirements, planTemplateInstall, sortTemplatesForSector } from "../src/lib/flows/install";
+import {
+  parseRequirements,
+  placeNewStages,
+  planTemplateInstall,
+  sortTemplatesForSector,
+} from "../src/lib/flows/install";
 import {
   formatDuration,
   nextVersionNumber,
@@ -387,6 +392,19 @@ describe("template installation plan", () => {
       { name: "senza_canale" },
     ],
     contactFields: ["zona", 7],
+    stages: [
+      { key: "renewal_due", name: " In scadenza ", kind: "won" },
+      { key: "Bad Key", name: "x" },
+      { key: "renewal_due", name: "doppione" },
+      { key: "no_name", name: "  " },
+    ],
+    dealFields: [
+      { key: "targa", label: "Targa", type: "text" },
+      { key: "scadenza", label: "", type: "date" },
+      { key: "premio", type: "money" },
+      { key: "Targa!", label: "x" },
+      { key: "targa", label: "doppione" },
+    ],
   });
 
   it("reads requirements defensively", () => {
@@ -395,7 +413,65 @@ describe("template installation plan", () => {
       "sollecito_preventivo",
     ]);
     expect(requirements.contactFields).toEqual(["zona"]);
-    expect(parseRequirements(null)).toEqual({ messageTemplates: [], connections: [], contactFields: [] });
+    // A template may only ask for open stages; names are trimmed; keys must be flow keys.
+    expect(requirements.stages).toEqual([{ key: "renewal_due", name: "In scadenza", kind: "open" }]);
+    expect(requirements.dealFields).toEqual([
+      { key: "targa", label: "Targa", type: "text" },
+      { key: "scadenza", label: "scadenza", type: "date" },
+      { key: "premio", label: "premio", type: "text" },
+    ]);
+    expect(parseRequirements(null)).toEqual({
+      messageTemplates: [],
+      connections: [],
+      contactFields: [],
+      stages: [],
+      dealFields: [],
+    });
+  });
+
+  const pipeline = [
+    { id: "s-new", key: "new", position: 0, kind: "open" },
+    { id: "s-quote", key: "quote_sent", position: 1, kind: "open" },
+    { id: "s-won", key: "won", position: 2, kind: "won" },
+    { id: "s-lost", key: "lost", position: 3, kind: "lost" },
+  ];
+
+  it("places the stages a template needs after the last open stage, pushing won and lost down", () => {
+    expect(placeNewStages(pipeline, requirements.stages)).toEqual({
+      stagesToCreate: [{ key: "renewal_due", name: "In scadenza", kind: "open", position: 2 }],
+      stagesToMove: [
+        { id: "s-won", position: 3 },
+        { id: "s-lost", position: 4 },
+      ],
+    });
+    // Already there: nothing to do, whatever its position.
+    expect(
+      placeNewStages(
+        [...pipeline, { id: "s-ren", key: "renewal_due", position: 9, kind: "open" }],
+        requirements.stages,
+      ),
+    ).toEqual({ stagesToCreate: [], stagesToMove: [] });
+    // An empty pipeline: the new stage is the first one.
+    expect(placeNewStages([], requirements.stages).stagesToCreate).toEqual([
+      { key: "renewal_due", name: "In scadenza", kind: "open", position: 0 },
+    ]);
+  });
+
+  it("plans the missing stages and deal fields only when told what exists", () => {
+    const plan = planTemplateInstall(requirements, {
+      templates: [],
+      connections: [],
+      stages: pipeline,
+      dealFields: [{ key: "targa" }],
+    });
+    expect(plan.stagesToCreate.map((stage) => stage.key)).toEqual(["renewal_due"]);
+    expect(plan.stagesToMove).toHaveLength(2);
+    expect(plan.dealFieldsToCreate.map((field) => field.key)).toEqual(["scadenza", "premio"]);
+    // Without the organization's stages and fields (the flow page after installation) nothing is planned.
+    const unaware = planTemplateInstall(requirements, { templates: [], connections: [] });
+    expect(unaware.stagesToCreate).toEqual([]);
+    expect(unaware.stagesToMove).toEqual([]);
+    expect(unaware.dealFieldsToCreate).toEqual([]);
   });
 
   it("creates only the missing message templates and lists what is still missing", () => {
@@ -446,9 +522,15 @@ describe("template installation plan", () => {
       const plan = planTemplateInstall(parseRequirements(template.requirements), {
         templates: [],
         connections: [],
+        stages: pipeline,
+        dealFields: [],
       });
       expect(plan.templatesToCreate).toHaveLength(template.requirements.messageTemplates.length);
       expect(plan.missingConnections).toHaveLength(new Set(template.requirements.connections).size);
+      expect(plan.stagesToCreate.map((stage) => stage.key)).toEqual(
+        (template.requirements.stages ?? []).map((stage) => stage.key),
+      );
+      expect(plan.dealFieldsToCreate).toEqual(template.requirements.dealFields ?? []);
     }
   });
 

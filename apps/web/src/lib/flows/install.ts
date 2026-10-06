@@ -1,4 +1,5 @@
 import { CHANNELS, type Channel, type FlowDefinition, FlowDefinitionSchema } from "@ia-connect/core";
+import { DEAL_FIELD_TYPES, type DealFieldDef, type DealFieldType } from "../deals/stages";
 
 /**
  * What installing a library template creates and what is still missing
@@ -10,7 +11,13 @@ export interface TemplateRequirements {
   /** Connector categories that must be connected before activation. */
   connections: string[];
   contactFields: string[];
+  /** Deal stages the flow uses: created when missing, after the last open stage. */
+  stages: { key: string; name: string; kind: "open" }[];
+  /** Deal custom fields the flow writes: added to the organization's definitions when missing. */
+  dealFields: DealFieldDef[];
 }
+
+const STAGE_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 
 function strings(value: unknown): string[] {
   return Array.isArray(value)
@@ -30,10 +37,33 @@ export function parseRequirements(value: unknown): TemplateRequirements {
     if (!CHANNELS.includes(channel as Channel)) continue;
     messageTemplates.push({ channel: channel as Channel, name, body });
   }
+  const stages: TemplateRequirements["stages"] = [];
+  for (const item of Array.isArray(record.stages) ? record.stages : []) {
+    if (!item || typeof item !== "object") continue;
+    const { key, name } = item as Record<string, unknown>;
+    if (typeof key !== "string" || !STAGE_KEY.test(key) || typeof name !== "string" || !name.trim()) continue;
+    if (stages.some((stage) => stage.key === key)) continue;
+    // Only open stages can be asked for: a template never decides what "won" or "lost" means.
+    stages.push({ key, name: name.trim().slice(0, 60), kind: "open" });
+  }
+  const dealFields: DealFieldDef[] = [];
+  for (const item of Array.isArray(record.dealFields) ? record.dealFields : []) {
+    if (!item || typeof item !== "object") continue;
+    const { key, label, type } = item as Record<string, unknown>;
+    if (typeof key !== "string" || !STAGE_KEY.test(key)) continue;
+    if (dealFields.some((field) => field.key === key)) continue;
+    dealFields.push({
+      key,
+      label: typeof label === "string" && label.trim() ? label.trim().slice(0, 60) : key,
+      type: (DEAL_FIELD_TYPES as readonly string[]).includes(String(type)) ? (type as DealFieldType) : "text",
+    });
+  }
   return {
     messageTemplates,
     connections: strings(record.connections),
     contactFields: strings(record.contactFields),
+    stages,
+    dealFields,
   };
 }
 
@@ -52,8 +82,42 @@ export interface InstallPlan {
   missingConnections: { category: string; existing: boolean }[];
   /** Custom contact fields the flow reads: the customer must fill them on the contacts. */
   contactFields: string[];
+  /** Deal stages to insert, with their position; empty when `existing.stages` was not given. */
+  stagesToCreate: { key: string; name: string; kind: "open"; position: number }[];
+  /** Existing stages whose position must change to leave room for the new ones (won/lost move after). */
+  stagesToMove: { id: string; position: number }[];
+  /** Deal custom field definitions to append to `org_settings.deal_custom_fields`. */
+  dealFieldsToCreate: DealFieldDef[];
   /** Nothing left to do before activation (validation still has the last word). */
   ready: boolean;
+}
+
+/**
+ * Where the stages a template needs go: after the last open stage, before won and lost,
+ * which are pushed down. Positions are renumbered 0..n-1 like `reorderStages` does.
+ */
+export function placeNewStages(
+  existing: readonly { id: string; key: string; position: number; kind: string }[],
+  wanted: readonly { key: string; name: string; kind: "open" }[],
+): Pick<InstallPlan, "stagesToCreate" | "stagesToMove"> {
+  const missing = wanted.filter((stage) => !existing.some((item) => item.key === stage.key));
+  if (missing.length === 0) return { stagesToCreate: [], stagesToMove: [] };
+  const ordered = [...existing].sort((a, b) => a.position - b.position);
+  const open = ordered.filter((stage) => stage.kind === "open");
+  const closed = ordered.filter((stage) => stage.kind !== "open");
+  const sequence: ({ id: string; position: number } | { key: string; name: string; kind: "open" })[] = [
+    ...open,
+    ...missing,
+    ...closed,
+  ];
+  const stagesToCreate: InstallPlan["stagesToCreate"] = [];
+  const stagesToMove: InstallPlan["stagesToMove"] = [];
+  sequence.forEach((item, position) => {
+    if ("id" in item) {
+      if (item.position !== position) stagesToMove.push({ id: item.id, position });
+    } else stagesToCreate.push({ ...item, position });
+  });
+  return { stagesToCreate, stagesToMove };
 }
 
 export function planTemplateInstall(
@@ -62,6 +126,10 @@ export function planTemplateInstall(
     templates: readonly { channel: string; name: string; approval_status: string }[];
     /** Connections with the category of their connector type. */
     connections: readonly { category: string; status: string }[];
+    /** Deal stages of the organization; when omitted, no stage is planned. */
+    stages?: readonly { id: string; key: string; position: number; kind: string }[];
+    /** Deal custom field definitions of the organization; when omitted, no field is planned. */
+    dealFields?: readonly { key: string }[];
   },
 ): InstallPlan {
   const templatesToCreate: InstallPlan["templatesToCreate"] = [];
@@ -96,11 +164,20 @@ export function planTemplateInstall(
     });
   }
 
+  const placed = existing.stages
+    ? placeNewStages(existing.stages, requirements.stages)
+    : { stagesToCreate: [], stagesToMove: [] };
+  const dealFieldsToCreate = existing.dealFields
+    ? requirements.dealFields.filter((field) => !existing.dealFields!.some((item) => item.key === field.key))
+    : [];
+
   return {
     templatesToCreate,
     templatesAwaitingApproval,
     missingConnections,
     contactFields: requirements.contactFields,
+    ...placed,
+    dealFieldsToCreate,
     ready: templatesAwaitingApproval.length === 0 && missingConnections.length === 0,
   };
 }

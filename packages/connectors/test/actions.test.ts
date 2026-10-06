@@ -637,6 +637,125 @@ describe("other connectors", () => {
     expect((await crmRestConnector.poll!(context, second.cursor)).events).toEqual([]);
   });
 
+  it("the REST adapter can emit every record on the first poll, under another event type and with a contact hint", async () => {
+    const policies = [
+      {
+        policyUID: "0198-a",
+        plate: "FX456DE",
+        client_name: "ANNA VERDI",
+        phone: "3337654321",
+        email: "Anna@Example.com",
+      },
+      {
+        policyUID: "0198-b",
+        plate: "GA123BC",
+        client_name: "MARIO ROSSI",
+        phone: "+39 333 1234567",
+        email: "",
+      },
+    ];
+    const { fetch, calls } = fakeFetch(() => json({ status: "success", policies }));
+    const context = makeContext({
+      connectorKey: "crm_rest",
+      config: {
+        baseUrl: "https://gestionale.example.com",
+        resources: {
+          policies: {
+            listPath: "/api/policies/expiring_api",
+            recordsPath: "policies",
+            idField: "policyUID",
+            query: { client_code: "AG01" },
+            watch: true,
+            initialPoll: "emit",
+            eventType: "policy.expiring",
+            contactFields: { name: "client_name", phone: "phone", email: "email" },
+          },
+        },
+      },
+      secrets: { authHeaderValue: "Bearer k" },
+      fetch,
+    });
+    const first = await crmRestConnector.poll!(context, undefined);
+    expect(calls[0]!.url).toBe("https://gestionale.example.com/api/policies/expiring_api?client_code=AG01");
+    expect(first.events).toEqual([
+      {
+        type: "policy.expiring",
+        dedupeKey: `crm_rest:${context.connection.id}:policies:0198-a`,
+        payload: { resource: "policies", id: "0198-a", data: policies[0] },
+        contact: { name: "ANNA VERDI", phone: "+393337654321", email: "anna@example.com" },
+      },
+      {
+        type: "policy.expiring",
+        dedupeKey: `crm_rest:${context.connection.id}:policies:0198-b`,
+        payload: { resource: "policies", id: "0198-b", data: policies[1] },
+        contact: { name: "MARIO ROSSI", phone: "+393331234567" },
+      },
+    ]);
+    expect(first.cursor).toEqual({ seen: { policies: ["0198-a", "0198-b"] } });
+    // The same list again: nothing new. A record that appears later: one event.
+    expect((await crmRestConnector.poll!(context, first.cursor)).events).toEqual([]);
+    policies.push({ policyUID: "0198-c", plate: "AB000CD", client_name: "LUCA NERI", phone: "", email: "" });
+    const third = await crmRestConnector.poll!(context, first.cursor);
+    expect(third.events.map((event) => event.payload.id)).toEqual(["0198-c"]);
+    expect(third.events[0]!.contact).toEqual({ name: "LUCA NERI" });
+  });
+
+  it("the REST adapter rejects an unknown event type at connect time", async () => {
+    const error = await failure(
+      crmRestConnector.connect(
+        {
+          baseUrl: "https://gestionale.example.com",
+          authHeaderValue: "k",
+          resources: { a: { listPath: "/a", watch: true, eventType: "whatsapp.message.receivedX" } },
+        },
+        { fetch: fakeFetch(() => json([])).fetch, env: {} },
+      ),
+    );
+    expect(error.retryable).toBe(false);
+    expect(error.message).toContain("eventType");
+  });
+
+  it("the REST adapter maps the management system's error codes without echoing the body", async () => {
+    const answer = (status: number, body: unknown) =>
+      makeContext({
+        connectorKey: "crm_rest",
+        config: {
+          baseUrl: "https://gestionale.example.com",
+          resources: { policies: { listPath: "/api/policies/expiring_api", watch: true } },
+        },
+        secrets: { authHeaderValue: "Bearer secret-token" },
+        fetch: fakeFetch(() => json(body, status)).fetch,
+      });
+
+    const revoked = answer(401, { status: "error", error: "token_revoked", detail: "SECRET-DETAIL" });
+    expect(await crmRestConnector.verify(revoked)).toEqual({
+      status: "expired",
+      message: "Accesso scaduto o revocato: ricollega l'account.",
+    });
+    const revokedPoll = await failure(crmRestConnector.poll!(revoked, undefined));
+    expect(revokedPoll.options.code).toBe("auth_expired");
+    expect(revokedPoll.message).not.toContain("SECRET-DETAIL");
+
+    const scope = answer(403, { status: "error", error: "scope_not_allowed" });
+    const scopeError = await failure(crmRestConnector.poll!(scope, undefined));
+    expect(scopeError.retryable).toBe(false);
+    expect(scopeError.options.code).toBe("scope_not_allowed");
+    expect(scopeError.message).toBe(
+      "Gestionale: il token API non ha il permesso di leggere questa risorsa (scope_not_allowed): va abilitato nel gestionale",
+    );
+    // A permission problem is not an expired access: verify says what is wrong instead.
+    expect(await crmRestConnector.verify(scope)).toEqual({ status: "error", message: scopeError.message });
+
+    const mismatch = await failure(
+      crmRestConnector.poll!(answer(403, { code: "client_code_mismatch" }), undefined),
+    );
+    expect(mismatch.options.code).toBe("client_code_mismatch");
+    expect(mismatch.message).toContain("codice cliente");
+
+    // A bare 403 still counts as a revoked key on verify (same as before).
+    expect((await crmRestConnector.verify(answer(403, {}))).status).toBe("expired");
+  });
+
   it("the generic inbound webhook does not support read and write", async () => {
     const context = makeContext({ connectorKey: "webhook_inbound" });
     for (const key of ["read", "write"]) {

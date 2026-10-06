@@ -19,6 +19,10 @@ export interface FlowTemplate {
     connections: string[];
     /** Custom contact fields the flow reads. */
     contactFields?: string[];
+    /** Deal stages the flow uses that a fresh pipeline may lack: created at installation, after the last open stage. */
+    stages?: { key: string; name: string; kind: "open" }[];
+    /** Deal custom fields the flow writes: added to `org_settings.deal_custom_fields` at installation. */
+    dealFields?: { key: string; label: string; type: "text" | "number" | "date" | "boolean" }[];
   };
 }
 
@@ -147,6 +151,260 @@ export const FLOW_TEMPLATES: FlowTemplate[] = [
           params: {
             message:
               "{{contact.full_name}} attende un contatto per il preventivo {{steps.extract.output.data.product}}.",
+          },
+        },
+      ],
+    },
+  },
+  {
+    key: "insurance_policy_renewal",
+    sector: "insurance",
+    name: "Polizza in scadenza → WhatsApp → trattativa di rinnovo",
+    description:
+      "Quando il gestionale segnala una polizza dell'agenzia in scadenza, avvisa il cliente su WhatsApp, apre la trattativa di rinnovo con targa e scadenza, risponde alle domande e sollecita dopo tre giorni di silenzio.",
+    requirements: {
+      connections: ["crm", "whatsapp"],
+      messageTemplates: [
+        {
+          channel: "whatsapp",
+          name: "rinnovo_polizza",
+          body: "Buongiorno {{1}}, la polizza della targa {{2}} scade il {{3}}. Possiamo preparare il rinnovo: ci scriva qui per confermare o per qualsiasi domanda. Questo è un messaggio automatico.",
+        },
+        {
+          channel: "whatsapp",
+          name: "sollecito_rinnovo",
+          body: "Buongiorno {{1}}, le ricordiamo che la polizza della targa {{2}} scade il {{3}}. Se vuole rinnovarla o ha domande, ci scriva qui. Questo è un messaggio automatico.",
+        },
+      ],
+      stages: [{ key: "renewal_due", name: "In scadenza", kind: "open" }],
+      dealFields: [
+        { key: "targa", label: "Targa", type: "text" },
+        { key: "scadenza", label: "Scadenza", type: "date" },
+        { key: "compagnia", label: "Compagnia", type: "text" },
+        { key: "premio", label: "Premio", type: "number" },
+        { key: "tipo", label: "Tipo", type: "text" },
+        { key: "numero_polizza", label: "Numero polizza", type: "text" },
+      ],
+    },
+    definition: {
+      trigger: { event: "policy.expiring", filters: [] },
+      steps: [
+        {
+          id: "contact",
+          block: "contact.upsert",
+          params: {
+            name: "{{event.payload.data.client_name}}",
+            phone: "{{event.payload.data.phone}}",
+            email: "{{event.payload.data.email}}",
+            fields: { codice_fiscale: "{{event.payload.data.client_cf}}" },
+            consent: { channel: "whatsapp", source: "Cliente con polizza in agenzia" },
+          },
+        },
+        {
+          id: "send_notice",
+          block: "whatsapp.send_template",
+          params: {
+            template: "rinnovo_polizza",
+            variables: {
+              "1": "{{contact.full_name}}",
+              "2": "{{event.payload.data.plate}}",
+              "3": "{{event.payload.data.expire_date}}",
+            },
+          },
+        },
+        {
+          id: "deal",
+          block: "deal.create",
+          params: {
+            title: "Rinnovo {{event.payload.data.product_name}} · {{event.payload.data.plate}}",
+            stage: "renewal_due",
+            value: "{{event.payload.data.policy_price}}",
+            nextAction: "Rinnovare prima del {{event.payload.data.expire_date}}",
+            fields: {
+              targa: "{{event.payload.data.plate}}",
+              scadenza: "{{event.payload.data.expire_date}}",
+              compagnia: "{{event.payload.data.company_slug}}",
+              premio: "{{event.payload.data.policy_price}}",
+              tipo: "polizza",
+              numero_polizza: "{{event.payload.data.policy_num}}",
+            },
+          },
+        },
+        {
+          id: "wait_reply",
+          block: "wait.for_reply",
+          params: { timeout: "72h" },
+          onReply: "answer",
+          onTimeout: "reminder",
+        },
+        {
+          id: "answer",
+          block: "ai.reply",
+          params: {
+            scope:
+              "Rinnovo della polizza in scadenza: documenti necessari, tempi e modalità per rinnovare, cosa succede alla scadenza. Non comunicare prezzi o premi diversi da quelli già indicati al cliente.",
+            maxTurns: 6,
+            idleTimeout: "24h",
+          },
+          next: "negotiation",
+          onHandoff: "notify",
+        },
+        {
+          id: "negotiation",
+          block: "deal.update_stage",
+          params: { stage: "negotiation", nextAction: "Chiudere il rinnovo" },
+          next: "end",
+        },
+        {
+          id: "reminder",
+          block: "whatsapp.send_template",
+          params: {
+            template: "sollecito_rinnovo",
+            variables: {
+              "1": "{{contact.full_name}}",
+              "2": "{{event.payload.data.plate}}",
+              "3": "{{event.payload.data.expire_date}}",
+            },
+          },
+        },
+        {
+          id: "wait_again",
+          block: "wait.for_reply",
+          params: { timeout: "72h" },
+          onReply: "answer",
+          onTimeout: "notify",
+        },
+        {
+          id: "notify",
+          block: "human.notify_owner",
+          params: {
+            message:
+              "{{contact.full_name}} attende un contatto per il rinnovo della polizza {{event.payload.data.plate}}, in scadenza il {{event.payload.data.expire_date}}.",
+          },
+        },
+      ],
+    },
+  },
+  {
+    key: "insurance_quote_expiring",
+    sector: "insurance",
+    name: "Copertura altrui in scadenza → WhatsApp → trattativa",
+    description:
+      "Quando il gestionale segnala che la copertura di una targa preventivata, oggi assicurata altrove, sta per scadere, ricorda al cliente che il preventivo è ancora valido, apre la trattativa e risponde alle domande.",
+    requirements: {
+      connections: ["crm", "whatsapp"],
+      messageTemplates: [
+        {
+          channel: "whatsapp",
+          name: "scadenza_copertura",
+          body: "Buongiorno {{1}}, la copertura della targa {{2}} con {{3}} scade il {{4}}. Il preventivo che le abbiamo preparato è ancora valido: se vuole attivarlo o ha domande, ci scriva qui. Questo è un messaggio automatico.",
+        },
+        {
+          channel: "whatsapp",
+          name: "sollecito_copertura",
+          body: "Buongiorno {{1}}, le ricordiamo che la copertura della targa {{2}} scade il {{3}}. Il nostro preventivo è ancora valido: ci scriva qui per procedere. Questo è un messaggio automatico.",
+        },
+      ],
+      stages: [{ key: "renewal_due", name: "In scadenza", kind: "open" }],
+      dealFields: [
+        { key: "targa", label: "Targa", type: "text" },
+        { key: "scadenza", label: "Scadenza", type: "date" },
+        { key: "compagnia_attuale", label: "Compagnia attuale", type: "text" },
+        { key: "tipo", label: "Tipo", type: "text" },
+      ],
+    },
+    definition: {
+      trigger: { event: "quote.expiring", filters: [] },
+      steps: [
+        {
+          id: "contact",
+          block: "contact.upsert",
+          params: {
+            name: "{{event.payload.data.client_name}}",
+            phone: "{{event.payload.data.phone}}",
+            email: "{{event.payload.data.email}}",
+            fields: { codice_fiscale: "{{event.payload.data.client_cf}}" },
+            consent: { channel: "whatsapp", source: "Cliente con preventivo in agenzia" },
+          },
+        },
+        {
+          id: "send_notice",
+          block: "whatsapp.send_template",
+          params: {
+            template: "scadenza_copertura",
+            variables: {
+              "1": "{{contact.full_name}}",
+              "2": "{{event.payload.data.plate}}",
+              "3": "{{event.payload.data.current_company}}",
+              "4": "{{event.payload.data.expire_date}}",
+            },
+          },
+        },
+        {
+          id: "deal",
+          block: "deal.create",
+          params: {
+            title: "Preventivo {{event.payload.data.product_name}} · {{event.payload.data.plate}}",
+            stage: "renewal_due",
+            nextAction: "Proporre l'attivazione prima del {{event.payload.data.expire_date}}",
+            fields: {
+              targa: "{{event.payload.data.plate}}",
+              scadenza: "{{event.payload.data.expire_date}}",
+              compagnia_attuale: "{{event.payload.data.current_company}}",
+              tipo: "preventivo",
+            },
+          },
+        },
+        {
+          id: "wait_reply",
+          block: "wait.for_reply",
+          params: { timeout: "72h" },
+          onReply: "answer",
+          onTimeout: "reminder",
+        },
+        {
+          id: "answer",
+          block: "ai.reply",
+          params: {
+            scope:
+              "Attivazione del preventivo già fatto per la targa la cui copertura sta scadendo: documenti necessari, tempi e modalità per passare alla nuova polizza, cosa succede alla scadenza della copertura attuale. Non comunicare prezzi diversi da quelli del preventivo già consegnato.",
+            maxTurns: 6,
+            idleTimeout: "24h",
+          },
+          next: "negotiation",
+          onHandoff: "notify",
+        },
+        {
+          id: "negotiation",
+          block: "deal.update_stage",
+          params: { stage: "negotiation", nextAction: "Chiudere la polizza" },
+          next: "end",
+        },
+        {
+          id: "reminder",
+          block: "whatsapp.send_template",
+          params: {
+            template: "sollecito_copertura",
+            variables: {
+              "1": "{{contact.full_name}}",
+              "2": "{{event.payload.data.plate}}",
+              "3": "{{event.payload.data.expire_date}}",
+            },
+          },
+        },
+        {
+          id: "wait_again",
+          block: "wait.for_reply",
+          params: { timeout: "72h" },
+          onReply: "answer",
+          onTimeout: "notify",
+        },
+        {
+          id: "notify",
+          block: "human.notify_owner",
+          params: {
+            message:
+              "{{contact.full_name}} attende un contatto per il preventivo della targa {{event.payload.data.plate}}: la copertura attuale scade il {{event.payload.data.expire_date}}.",
           },
         },
       ],

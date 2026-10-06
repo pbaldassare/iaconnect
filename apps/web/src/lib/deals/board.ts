@@ -146,21 +146,78 @@ export interface DealFilter {
   stageId: string | null;
   /** A user id, "nessuno" for unassigned, or null for everyone. */
   assignee: string | null;
+  /** "Scadenze": only open deals with the `scadenza` custom field, ordered by that date. */
+  dueOnly: boolean;
 }
+
+/** Key of the deal custom field the "Scadenze" view reads (the renewal templates write it). */
+export const DUE_FIELD = "scadenza";
 
 type Param = string | string[] | undefined;
 const first = (value: Param) => ((Array.isArray(value) ? value[0] : value) ?? "").trim();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function parseDealFilter(params: { stato?: Param; fase?: Param; assegnata?: Param }): DealFilter {
+export function parseDealFilter(params: {
+  stato?: Param;
+  fase?: Param;
+  assegnata?: Param;
+  scadenze?: Param;
+}): DealFilter {
   const state = first(params.stato);
   const stage = first(params.fase);
   const assignee = first(params.assegnata);
+  const dueOnly = first(params.scadenze) === "1";
   return {
-    state: (DEAL_STATES as readonly string[]).includes(state) ? (state as DealState) : "aperte",
+    // The due view is about what is still to be renewed: it always reads the open deals.
+    state: dueOnly
+      ? "aperte"
+      : (DEAL_STATES as readonly string[]).includes(state)
+        ? (state as DealState)
+        : "aperte",
     stageId: UUID.test(stage) ? stage : null,
     assignee: assignee === "nessuno" || UUID.test(assignee) ? assignee : null,
+    dueOnly,
   };
+}
+
+/** The `scadenza` custom field as a calendar day, or null when missing or not a date. */
+export function dueDateOf(customFields: unknown): string | null {
+  if (typeof customFields !== "object" || customFields === null || Array.isArray(customFields)) return null;
+  const raw = (customFields as Record<string, unknown>)[DUE_FIELD];
+  if (typeof raw !== "string") return null;
+  const day = raw.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const time = new Date(`${day}T00:00:00Z`).getTime();
+  // A day that does not exist (30 February) rolls over in JavaScript: refuse it.
+  return Number.isNaN(time) || new Date(time).toISOString().slice(0, 10) !== day ? null : day;
+}
+
+/** Whole days from today (UTC) to the given day: negative when already past. */
+export function daysUntil(day: string, now: Date = new Date()): number {
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.round((new Date(`${day}T00:00:00Z`).getTime() - today) / 86_400_000);
+}
+
+export function daysLeftLabel(days: number): string {
+  if (days === 0) return "oggi";
+  if (days === 1) return "domani";
+  if (days === -1) return "scaduta ieri";
+  if (days < 0) return `scaduta da ${-days} giorni`;
+  return `tra ${days} giorni`;
+}
+
+/** Open deals that carry a due date, the nearest first (ties: the oldest deal first). */
+export function dueDeals<D extends DealLike & { custom_fields: unknown }>(
+  deals: readonly D[],
+  stages: readonly StageLike[],
+  filter: DealFilter,
+): (D & { dueDate: string })[] {
+  return filterDeals(deals, stages, { ...filter, state: "aperte" })
+    .flatMap((deal) => {
+      const dueDate = dueDateOf(deal.custom_fields);
+      return dueDate ? [{ ...deal, dueDate }] : [];
+    })
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.created_at.localeCompare(b.created_at));
 }
 
 /** Stage ids a filter selects; used to build the database query of the list view. */

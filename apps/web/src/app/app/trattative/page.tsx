@@ -4,7 +4,7 @@ import { StatusPill } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/form-message";
-import { Select } from "@/components/ui/input";
+import { Checkbox, Select } from "@/components/ui/input";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 import { Table, Td, Th } from "@/components/ui/table";
@@ -16,13 +16,18 @@ import { loadAssignees } from "@/lib/deals/assignees";
 import {
   DEAL_STATES,
   DEAL_STATE_LABELS,
+  DUE_FIELD,
   buildBoard,
+  daysLeftLabel,
+  daysUntil,
   dealAgeDays,
   dealAgeLabel,
+  dueDeals,
   parseDealFilter,
   sortStages,
   stageIdsForFilter,
 } from "@/lib/deals/board";
+import { parseDealFieldDefs } from "@/lib/deals/stages";
 import { featureOn } from "@/lib/feature-gate";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { firstParam, pageWindow, parsePage, withParams } from "@/lib/pagination";
@@ -66,11 +71,17 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
   const params = await searchParams;
   const listView = firstParam(params.vista) === "elenco";
 
-  const stagesResult = await supabase
-    .from("deal_stages")
-    .select("id, name, position, kind")
-    .eq("organization_id", organizationId);
+  const [stagesResult, settings] = await Promise.all([
+    supabase.from("deal_stages").select("id, name, position, kind").eq("organization_id", organizationId),
+    supabase
+      .from("org_settings")
+      .select("deal_custom_fields")
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+  ]);
   const stages = sortStages(stagesResult.data ?? []);
+  // The "Scadenze" view exists only for organizations that track a due date on their deals.
+  const dueField = parseDealFieldDefs(settings.data?.deal_custom_fields).find((def) => def.key === DUE_FIELD);
 
   return (
     <>
@@ -107,7 +118,7 @@ export default async function DealsPage({ searchParams }: { searchParams: Promis
           }
         />
       ) : listView ? (
-        <DealList context={context} stages={stages} params={params} />
+        <DealList context={context} stages={stages} params={params} dueField={dueField?.label ?? null} />
       ) : (
         <Board context={context} stages={stages} />
       )}
@@ -260,14 +271,33 @@ async function Board({ context, stages }: { context: OrgContext; stages: Stage[]
   );
 }
 
+type ListRow = Pick<
+  Row<"deals">,
+  | "id"
+  | "title"
+  | "contact_id"
+  | "stage_id"
+  | "estimated_value_cents"
+  | "currency"
+  | "next_action"
+  | "next_action_at"
+  | "assignee_user_id"
+  | "created_at"
+> & { dueDate?: string };
+
+const LIST_COLUMNS =
+  "id, title, contact_id, stage_id, estimated_value_cents, currency, next_action, next_action_at, assignee_user_id, created_at";
+
 async function DealList({
   context,
   stages,
   params,
-}: { context: OrgContext; stages: Stage[]; params: Params }) {
+  dueField,
+}: { context: OrgContext; stages: Stage[]; params: Params; dueField: string | null }) {
   const { supabase, org, session } = context;
   const organizationId = org.organization.id;
   const filter = parseDealFilter(params);
+  const dueOnly = filter.dueOnly && dueField !== null;
   const page = parsePage(params.pagina);
   const { from, to } = pageWindow(page, PAGE_SIZE);
   const stageIds = stageIdsForFilter(stages, filter);
@@ -277,30 +307,34 @@ async function DealList({
     stato: filter.state === "aperte" ? null : filter.state,
     fase: filter.stageId,
     assegnata: filter.assignee,
+    scadenze: dueOnly ? "1" : null,
   };
+  const now = new Date();
 
-  let rows: Pick<
-    Row<"deals">,
-    | "id"
-    | "title"
-    | "contact_id"
-    | "stage_id"
-    | "estimated_value_cents"
-    | "currency"
-    | "next_action"
-    | "next_action_at"
-    | "assignee_user_id"
-    | "created_at"
-  >[] = [];
+  let rows: ListRow[] = [];
   let total = 0;
   let error: unknown = null;
-  if (stageIds.length > 0) {
+  if (stageIds.length > 0 && dueOnly) {
+    // The due date is a custom field: the open deals are read whole and ordered here.
+    const open = await fetchAllRows(
+      (start, end) =>
+        supabase
+          .from("deals")
+          .select(`${LIST_COLUMNS}, closed_at, custom_fields`)
+          .eq("organization_id", organizationId)
+          .in("stage_id", stageIds)
+          .order("created_at", { ascending: false })
+          .range(start, end),
+      BOARD_CAP,
+    );
+    error = open.error;
+    const due = dueDeals(open.rows, stages, filter);
+    total = due.length;
+    rows = due.slice(from, to + 1);
+  } else if (stageIds.length > 0) {
     let query = supabase
       .from("deals")
-      .select(
-        "id, title, contact_id, stage_id, estimated_value_cents, currency, next_action, next_action_at, assignee_user_id, created_at",
-        { count: "exact" },
-      )
+      .select(LIST_COLUMNS, { count: "exact" })
       .eq("organization_id", organizationId)
       .in("stage_id", stageIds)
       .order("created_at", { ascending: false })
@@ -332,6 +366,16 @@ async function DealList({
         className="mb-4 grid gap-2 sm:grid-cols-[repeat(3,minmax(0,1fr))_auto]"
       >
         <input type="hidden" name="vista" value="elenco" />
+        {dueField ? (
+          <Checkbox
+            name="scadenze"
+            value="1"
+            defaultChecked={dueOnly}
+            label="Scadenze"
+            description={`Solo le trattative aperte con «${dueField}», dalla più vicina`}
+            className="sm:col-span-4"
+          />
+        ) : null}
         <div>
           <label htmlFor="deal-state" className="sr-only">
             Stato
@@ -398,6 +442,7 @@ async function DealList({
             <thead>
               <tr>
                 <Th>Trattativa</Th>
+                {dueOnly ? <Th>Scadenza</Th> : null}
                 <Th>Fase</Th>
                 <Th align="right">Valore</Th>
                 <Th>Prossima azione</Th>
@@ -408,6 +453,7 @@ async function DealList({
             <tbody>
               {rows.map((deal) => {
                 const stage = stageById.get(deal.stage_id);
+                const daysLeft = deal.dueDate ? daysUntil(deal.dueDate, now) : null;
                 return (
                   <tr key={deal.id}>
                     <Td>
@@ -418,6 +464,27 @@ async function DealList({
                         {names.get(deal.contact_id) ?? "—"}
                       </span>
                     </Td>
+                    {dueOnly ? (
+                      <Td>
+                        <span className="font-mono tabular-nums">
+                          {deal.dueDate ? formatDate(deal.dueDate) : "—"}
+                        </span>
+                        {daysLeft !== null ? (
+                          <span
+                            className={cn(
+                              "block text-[13px]",
+                              daysLeft < 0
+                                ? "font-medium text-danger"
+                                : daysLeft <= 7
+                                  ? "text-warn"
+                                  : "text-muted",
+                            )}
+                          >
+                            {daysLeftLabel(daysLeft)}
+                          </span>
+                        ) : null}
+                      </Td>
+                    ) : null}
                     <Td>
                       {stage?.name ?? "—"}
                       {stage && stage.kind !== "open" ? (

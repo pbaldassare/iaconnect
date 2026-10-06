@@ -140,11 +140,34 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 
 - **Il cliente fornisce:** indirizzo di base dell'API, nome e valore dell'intestazione
   di autenticazione (il valore è un segreto), elenco delle risorse:
-  `{ nome: { listPath, createPath?, updatePath?, updateMethod?, idField, recordsPath?, watch? } }`.
-- **Emette:** `crm.record.created` per le risorse con `watch: true` (polling: il primo
-  controllo memorizza i record esistenti, i successivi segnalano quelli nuovi).
-- **Offre:** `read` (`query` diventa parametri dell'indirizzo), `write` (POST per creare,
-  PUT o PATCH su `updatePath` con `{id}` per aggiornare).
+  `{ nome: { listPath, createPath?, updatePath?, updateMethod?, idField, recordsPath?, query?, watch?, initialPoll?, eventType?, contactFields? } }`.
+- **Emette:** per le risorse con `watch: true`, un evento per ogni record **nuovo**
+  (polling). «Nuovo» vuol dire «con un identificativo (`idField`) non tra quelli già visti»:
+  l'elenco degli id visti è il cursore, in `connections.config.cursor.seen[risorsa]`,
+  al massimo 10.000 per risorsa (i più recenti). Opzioni per risorsa, tutte facoltative:
+  - `initialPoll`: `"ignore"` (predefinito) al primo controllo memorizza i record esistenti
+    senza segnalarli; `"emit"` li segnala tutti (per gli elenchi che sono da lavorare per
+    intero, come le polizze in scadenza).
+  - `eventType`: tipo emesso al posto di `crm.record.created`; deve essere un tipo noto
+    (`isKnownEventType`), controllato al collegamento e a ogni lettura della configurazione.
+    Con `policy.expiring` / `quote.expiring` l'evento è riservato: il worker lo accetta solo
+    perché arriva da questo collegamento (categoria `crm`).
+  - `contactFields`: `{ name?, phone?, email? }`, nomi dei campi del record da cui riempire il
+    suggerimento di contatto dell'evento (`contact_hint`); il telefono passa da
+    `normalizePhone` (`3331234567` → `+393331234567`), la mail in minuscolo.
+  - `query`: parametri fissi aggiunti all'indirizzo dell'elenco (es. `client_code`).
+  Il payload è sempre `{ resource, id, data }`; la chiave di deduplica
+  `crm_rest:<collegamento>:<risorsa>:<id>`. L'intervallo di lettura è
+  `config.pollIntervalMinutes` (da 1 minuto a 24 ore, vedi `docs/moduli/worker.md`).
+- **Offre:** `read` (`query` diventa parametri dell'indirizzo, sommati a quelli fissi della
+  risorsa), `write` (POST per creare, PUT o PATCH su `updatePath` con `{id}` per aggiornare).
+- **Errori del gestionale:** un 401, o un 403 il cui corpo JSON porta `token_revoked` o
+  `api_token_required`, è un accesso scaduto (`auth_expired` → stato `expired`); un 403 con
+  `scope_not_allowed` o `client_code_mismatch` è un errore definitivo con un messaggio
+  italiano dedicato (in `verify` → stato `error`); un 403 senza codice vale come 401. Il
+  codice è letto dai campi `error`, `code`, `error_code`, `reason`, `message`; il corpo non
+  compare mai nei messaggi. Esempio completo per Assicurapp in
+  `docs/riferimenti/assicurapp-scadenze.md`.
 - Rifiuta indirizzi privati, locali e interni (classificatore di `packages/core/src/net.ts`).
   Ogni richiesta passa da `guardedFetch`: nome dell'host, risoluzione DNS (dove il runtime
   la fornisce: worker e server web) e ogni passaggio di un reindirizzamento, seguito a mano

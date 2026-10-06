@@ -46,6 +46,16 @@ export const EVENT_TYPES = {
   },
   "crm.record.created": { title: "Nuovo record nel gestionale", payload: "resource, id, data{}" },
   "crm.record.updated": { title: "Record aggiornato nel gestionale", payload: "resource, id, data{}" },
+  "policy.expiring": {
+    title: "Polizza in scadenza",
+    payload:
+      "resource, id, data{policyUID, quoteUID?, policy_num, company_slug, expire_date, days_left, plate, client_name, client_cf?, phone?, email?, product_name, policy_price?, creator_name?, created_at?}",
+  },
+  "quote.expiring": {
+    title: "Preventivo con copertura in scadenza",
+    payload:
+      "resource, id, data{quoteUID, plate, client_name, client_cf?, phone?, email?, product_name, current_company, expire_date, days_left, creator_name?, created_at?}",
+  },
   "scrape.item.found": { title: "Nuovo elemento da un sito", payload: "recipeId, item{}" },
   "appointment.booked": { title: "Appuntamento fissato", payload: "start, end, title, contactId?" },
   "payment.completed": { title: "Pagamento completato", payload: "paymentRequestId, amount, currency" },
@@ -82,11 +92,12 @@ export function isOpenEventType(type: string): boolean {
  * Connector category a reserved event must come from. The worker gives an event of these
  * types its special meaning (store a message, update a delivery status, settle a payment or
  * a signature) only when `events.connection_id` is a connection of that category in the
- * same organization.
+ * same organization. `policy.expiring` and `quote.expiring` have no special meaning, but
+ * they start flows that write to customers: only a management-system poll may emit them.
  */
 export const RESERVED_EVENT_SOURCES: Record<
   string,
-  "whatsapp" | "mail" | "sms" | "social" | "payment" | "signature"
+  "whatsapp" | "mail" | "sms" | "social" | "payment" | "signature" | "crm"
 > = {
   "whatsapp.message.received": "whatsapp",
   "whatsapp.status.updated": "whatsapp",
@@ -96,6 +107,8 @@ export const RESERVED_EVENT_SOURCES: Record<
   "social.message.received": "social",
   "payment.completed": "payment",
   "signature.completed": "signature",
+  "policy.expiring": "crm",
+  "quote.expiring": "crm",
 };
 
 /** Inbound message events: they resume a waiting run before triggering new flows. */
