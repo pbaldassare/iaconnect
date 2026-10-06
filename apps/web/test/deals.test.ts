@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   buildBoard,
+  daysLeftLabel,
+  daysUntil,
   dealAgeDays,
   dealAgeLabel,
+  dueDateOf,
+  dueDeals,
   filterDeals,
   parseDealFilter,
   stageChange,
@@ -130,23 +134,75 @@ describe("deal list filters and age", () => {
     deal("d4", "s-lost", 1),
   ];
   it("parses the params", () => {
-    expect(parseDealFilter({})).toEqual({ state: "aperte", stageId: null, assignee: null });
+    expect(parseDealFilter({})).toEqual({ state: "aperte", stageId: null, assignee: null, dueOnly: false });
     expect(parseDealFilter({ stato: "vinte", fase: U1, assegnata: "nessuno" })).toEqual({
       state: "vinte",
       stageId: U1,
       assignee: "nessuno",
+      dueOnly: false,
     });
     expect(parseDealFilter({ stato: "x", fase: "y", assegnata: "z" })).toEqual({
       state: "aperte",
       stageId: null,
       assignee: null,
+      dueOnly: false,
     });
+    // The due view always looks at the open deals.
+    expect(parseDealFilter({ stato: "vinte", scadenze: "1" })).toMatchObject({
+      state: "aperte",
+      dueOnly: true,
+    });
+  });
+  it("lists the open deals with a due date, the nearest first", () => {
+    const due = (id: string, stage: string, scadenza: unknown, created = "2026-09-01T09:00:00Z") => ({
+      ...deal(id, stage, 1),
+      created_at: created,
+      custom_fields: scadenza === undefined ? {} : { scadenza },
+    });
+    const list = dueDeals(
+      [
+        due("late", "s-new", "2026-10-20", "2026-09-02T00:00:00Z"),
+        due("soon", "s-quote", "2026-10-07"),
+        due("same-day-older", "s-new", "2026-10-20", "2026-09-01T00:00:00Z"),
+        due("won", "s-won", "2026-10-01"),
+        due("none", "s-new", undefined),
+        due("bad", "s-new", "fine mese"),
+        due("timestamp", "s-quote", "2026-10-30T00:00:00.000Z"),
+      ],
+      stages,
+      { state: "tutte", stageId: null, assignee: null, dueOnly: true },
+    );
+    expect(list.map((d) => [d.id, d.dueDate])).toEqual([
+      ["soon", "2026-10-07"],
+      ["same-day-older", "2026-10-20"],
+      ["late", "2026-10-20"],
+      ["timestamp", "2026-10-30"],
+    ]);
+    expect(dueDateOf(null)).toBeNull();
+    expect(dueDateOf({ scadenza: "2026-02-30" })).toBeNull();
+    expect(dueDateOf({ scadenza: "2026-10-17" })).toBe("2026-10-17");
+  });
+  it("counts the days left and says them in Italian", () => {
+    expect(daysUntil("2026-10-04", now)).toBe(0);
+    expect(daysUntil("2026-10-07", now)).toBe(3);
+    expect(daysUntil("2026-10-01", now)).toBe(-3);
+    expect([
+      daysLeftLabel(0),
+      daysLeftLabel(1),
+      daysLeftLabel(12),
+      daysLeftLabel(-1),
+      daysLeftLabel(-5),
+    ]).toEqual(["oggi", "domani", "tra 12 giorni", "scaduta ieri", "scaduta da 5 giorni"]);
   });
   it("filters by state, stage and assignee", () => {
     const f = (filter: Partial<ReturnType<typeof parseDealFilter>>) =>
-      filterDeals(deals, stages, { state: "aperte", stageId: null, assignee: null, ...filter }).map(
-        (d) => d.id,
-      );
+      filterDeals(deals, stages, {
+        state: "aperte",
+        stageId: null,
+        assignee: null,
+        dueOnly: false,
+        ...filter,
+      }).map((d) => d.id);
     expect(f({})).toEqual(["d1", "d2"]);
     expect(f({ state: "vinte" })).toEqual(["d3"]);
     expect(f({ state: "perse" })).toEqual(["d4"]);
@@ -154,7 +210,9 @@ describe("deal list filters and age", () => {
     expect(f({ state: "tutte", stageId: "s-quote" })).toEqual(["d2"]);
     expect(f({ assignee: U1 })).toEqual(["d1"]);
     expect(f({ assignee: "nessuno" })).toEqual(["d2"]);
-    expect(stageIdsForFilter(stages, { state: "vinte", stageId: "s-new", assignee: null })).toEqual([]);
+    expect(
+      stageIdsForFilter(stages, { state: "vinte", stageId: "s-new", assignee: null, dueOnly: false }),
+    ).toEqual([]);
   });
   it("computes the age in whole days", () => {
     expect(dealAgeDays("2026-10-04T09:00:00Z", now)).toBe(0);

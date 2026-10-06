@@ -436,7 +436,7 @@ pure con test.
 | `/app/inbox/[id]` | membri | la conversazione: messaggi, stato di consegna, scheda del contatto, azioni e campo di scrittura. Su schermo stretto è una pagina a sé, su schermo largo sta accanto all'elenco |
 | `/app/contatti`, `/nuovo`, `/[id]`, `/[id]/modifica` | membri | elenco con ricerca e pagine, creazione, scheda (dati, consensi, memoria, storia, trattative, conversazioni), modifica |
 | `/app/contatti/[id]/export` | membri | scarica il JSON di `export_contact` (registrato come `contact.export`) |
-| `/app/trattative` | membri | colonne per fase con totali; `?vista=elenco` per l'elenco con filtri (stato, fase, assegnatario) |
+| `/app/trattative` | membri | colonne per fase con totali; `?vista=elenco` per l'elenco con filtri (stato, fase, assegnatario); `&scadenze=1` la vista «Scadenze», solo se l'azienda ha il campo `scadenza` tra i campi delle trattative |
 | `/app/trattative/nuova`, `/[id]` | membri | creazione a mano (`?contatto=<id>` preseleziona il contatto), scheda con modifica, fase, origine, storia |
 | `/app/report` | membri | `?periodo=` `questo-mese` (predefinito), `mese-scorso`, `7-giorni`, `30-giorni`, `90-giorni` |
 | `/app/impostazioni` | membri | indice delle sezioni |
@@ -462,7 +462,7 @@ Le sezioni Inbox, Trattative e Report rispettano le funzioni `inbox`, `deals`, `
 | `lib/message-templates.ts` | segnaposto `{{1}}`, `{{2}}`: elenco, anteprima, controlli |
 | `lib/contacts/consents.ts` | lettura, concessione e revoca del consenso (la revoca resta scritta con data e origine) |
 | `lib/contacts/fields.ts`, `timeline.ts` | telefoni, mail, campi personalizzati, filtro di ricerca; storia unica del contatto |
-| `lib/deals/board.ts` | colonne e totali, effetti di un cambio di fase (`closed_at`, riga di `deal_events`), filtri dell'elenco |
+| `lib/deals/board.ts` | colonne e totali, effetti di un cambio di fase (`closed_at`, riga di `deal_events`), filtri dell'elenco, vista «Scadenze» (`dueDeals`, `daysUntil`, `daysLeftLabel`) |
 | `lib/deals/stages.ts` | riordino delle fasi, chiavi, definizioni e valori dei campi delle trattative |
 | `lib/report/period.ts`, `metrics.ts`, `fetch.ts` | periodi, ogni cifra del report, lettura a pagine oltre le 1000 righe |
 | `lib/settings/brand.ts`, `members.ts` | marchio con `ownerPhone` / `ownerEmail`, regole su ruoli e ultimo titolare |
@@ -507,6 +507,13 @@ della conversazione, da un componente client (non durante il rendering).
   (`stage_changed`, da / a, attore). Creazione a mano → evento `created`; modifica dei dati
   → evento `updated` con i campi cambiati.
 - **Prossima azione**: è un giorno, salvato a mezzogiorno UTC.
+- **Scadenze**: quando i campi delle trattative comprendono `scadenza` (tipo data; lo
+  aggiungono i modelli di rinnovo), l'elenco offre la casella «Scadenze»: solo le trattative
+  aperte con `custom_fields.scadenza` valorizzato, dalla più vicina, con i giorni rimasti
+  («tra 3 giorni», «oggi», «scaduta da 2 giorni»; rosso se passata, ambra entro 7 giorni).
+  La data vive in un campo JSON: la vista legge le trattative aperte (fino a 3.000, come la
+  lavagna) e le ordina in memoria. Gli altri filtri (fase, assegnatario) restano validi; lo
+  stato è sempre «aperte».
 - **Fasi**: una fase con trattative non si elimina; serve sempre almeno una fase aperta; i
   flussi usano `key`, che non cambia quando si rinomina.
 - **Modelli**: solo WhatsApp ha lo stato di approvazione (impostato a mano dopo
@@ -655,6 +662,15 @@ Google, Microsoft e Meta è `<APP_URL>/api/oauth/<connector>/callback`.
   installazione da modello (`system`) creano una riga con `version = max + 1`
   (`insertFlowVersion`, con nuovo tentativo se due salvataggi si scontrano).
   `flows.trigger_event` segue l'ultima bozza solo finché il flusso non è mai stato attivato.
+- **Installazione da modello** (`lib/flows/install.ts` → `planTemplateInstall`, scritture in
+  `app/app/flussi/actions.ts`): `requirements` del modello → cosa creare. Modelli di
+  messaggio mancanti come bozze; **fasi** (`requirements.stages`, solo aperte) mancanti
+  inserite dopo l'ultima fase aperta e prima di «vinta» e «persa», che scalano di posizione
+  (`placeNewStages`, posizioni rinumerate 0..n-1); **campi delle trattative**
+  (`requirements.dealFields`) mancanti aggiunti in coda a `org_settings.deal_custom_fields`.
+  Fasi e campi già presenti (stessa `key`) non vengono toccati. Un errore in queste scritture
+  porta a `?installato=parziale`. La libreria (`/app/flussi/modelli`) elenca anche fasi e
+  campi che il modello creerà.
 - **Assistente**: permesso → `ANTHROPIC_API_KEY` → chiave di servizio → `quota_left` >
   0 → `proposeFlow` → riga in `ai_calls` (`flow_assistant`) e `add_usage` con `creditsFor`,
   anche quando la chiamata fallisce a metà (`AiOperationError`). La cronologia arriva dal

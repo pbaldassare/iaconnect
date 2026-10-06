@@ -19,8 +19,11 @@ che cambia da un'azienda all'altra sta nel database.
      `payment.completed` e `signature.completed` valgono come tali solo se
      `events.connection_id` è un collegamento della stessa azienda della categoria giusta
      (`RESERVED_EVENT_SOURCES` in `packages/core`: WhatsApp, mail, SMS, social, pagamenti,
-     firma). Altrimenti l'evento diventa `ignored` con il motivo in `error`: nessun contatto,
-     nessun consenso, nessuna finestra aperta, nessun pagamento segnato, nessun flusso.
+     firma; `policy.expiring` e `quote.expiring` dal gestionale, categoria `crm`). Altrimenti
+     l'evento diventa `ignored` con il motivo in `error`: nessun contatto, nessun consenso,
+     nessuna finestra aperta, nessun pagamento segnato, nessun flusso. Le scadenze del
+     gestionale non hanno altro significato speciale: non sono messaggi in arrivo, avviano
+     solo i flussi (`docs/decisioni/2026-10-06-15-scadenze-nel-gestionale.md`).
      Gli altri canali non possono comunque crearli: il «Webhook in ingresso» e i gestori
      (RLS) emettono solo i tipi aperti, `logic.for_each` solo `custom.*`.
    - Messaggio in arrivo (WhatsApp, mail, SMS, social): trova o crea contatto e

@@ -125,9 +125,24 @@ export default async function TemplatesPage() {
                     {requirements.contactFields.length > 0 ? (
                       <li>Campi dei contatti: {requirements.contactFields.join(", ")}</li>
                     ) : null}
+                    {requirements.stages.length > 0 ? (
+                      <li>
+                        Fasi delle trattative:{" "}
+                        {requirements.stages.map((stage) => `«${stage.name}»`).join(", ")} (create se mancano,
+                        prima di «vinta» e «persa»)
+                      </li>
+                    ) : null}
+                    {requirements.dealFields.length > 0 ? (
+                      <li>
+                        Campi delle trattative:{" "}
+                        {requirements.dealFields.map((field) => field.label).join(", ")} (aggiunti se mancano)
+                      </li>
+                    ) : null}
                     {requirements.connections.length === 0 &&
                     requirements.messageTemplates.length === 0 &&
-                    requirements.contactFields.length === 0 ? (
+                    requirements.contactFields.length === 0 &&
+                    requirements.stages.length === 0 &&
+                    requirements.dealFields.length === 0 ? (
                       <li>Nulla in particolare</li>
                     ) : null}
                   </ul>

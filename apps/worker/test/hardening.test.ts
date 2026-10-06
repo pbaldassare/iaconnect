@@ -202,6 +202,38 @@ describe("finding 7: reserved events count only when they come from the right co
     expect(h.calls).toHaveLength(1);
   });
 
+  it("starts a renewal flow only on a policy.expiring event that a management-system connection produced", async () => {
+    h = await createHarness();
+    await h.addFlow(NOTIFY_FLOW("policy.expiring"));
+    const payload = {
+      resource: "policies",
+      id: "0198",
+      data: { plate: "FX456DE", expire_date: "2026-10-20" },
+    };
+    const forged = [
+      await h.addEvent("policy.expiring", payload, { connectionId: null }),
+      await h.addEvent("policy.expiring", payload, { connectionId: h.connections.whatsapp }),
+    ];
+    await drain(h.deps);
+    for (const id of forged) {
+      const event = await h.one("select status, error from ia_connect.events where id = $1", [id]);
+      expect(event.status).toBe("ignored");
+      expect(event.error).toContain("collegamento di tipo crm");
+    }
+    expect(await h.all("select 1 from ia_connect.flow_runs")).toHaveLength(0);
+
+    // From the organization's management system (the default origin `addEvent` picks): a real one.
+    const real = await h.addEvent("policy.expiring", payload);
+    await drain(h.deps);
+    expect(await h.one("select status, connection_id from ia_connect.events where id = $1", [real])).toEqual({
+      status: "processed",
+      connection_id: h.connections.crm,
+    });
+    expect(await h.all("select 1 from ia_connect.flow_runs")).toHaveLength(1);
+    // It is not an inbound message: no contact, no conversation were created from it.
+    expect(await h.all("select 1 from ia_connect.conversations")).toHaveLength(0);
+  });
+
   it("does not settle a payment or a signature on a forged event", async () => {
     h = await createHarness();
     const request = await h.one(

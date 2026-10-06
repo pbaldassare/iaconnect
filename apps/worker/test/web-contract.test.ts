@@ -595,6 +595,8 @@ describe("flows", () => {
         messageTemplates: [{ channel: "whatsapp", name: "benvenuto", body: "Buongiorno {{1}}" }],
         connections: [],
         contactFields: [],
+        stages: [],
+        dealFields: [],
       },
       { templates: [], connections: [] },
     );

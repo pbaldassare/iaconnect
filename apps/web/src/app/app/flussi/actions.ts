@@ -1,6 +1,7 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { writeAudit } from "@/lib/audit";
+import { parseDealFieldDefs } from "@/lib/deals/stages";
 import { parseRequirements, parseTemplateDefinition, planTemplateInstall } from "@/lib/flows/install";
 import { parseDefinitionJson } from "@/lib/flows/runs";
 import { insertFlowVersion, loadFlowEnvironment, loadFlowPermissions } from "@/lib/flows/server";
@@ -117,7 +118,10 @@ export async function pauseFlow(
   return ok("Flusso in pausa: non parte per i nuovi eventi. Le esecuzioni già avviate proseguono.");
 }
 
-/** Installs a library template: the flow as a draft, version 1 by "system", missing message templates as drafts. */
+/**
+ * Installs a library template: the flow as a draft, version 1 by "system", missing message
+ * templates as drafts, missing deal stages (after the last open one) and missing deal fields.
+ */
 export async function installTemplate(
   templateId: string,
   _prev: ActionResult,
@@ -141,13 +145,24 @@ export async function installTemplate(
   if (!definition) return fail("Questo modello ha una definizione non valida. Segnalalo all'assistenza.");
   const requirements = parseRequirements(template.requirements);
 
-  const { data: existingTemplates, error: readError } = await supabase
-    .from("message_templates")
-    .select("channel, name, approval_status")
-    .eq("organization_id", orgId)
-    .limit(500);
+  const [existingTemplates, existingStages, settings] = await Promise.all([
+    supabase
+      .from("message_templates")
+      .select("channel, name, approval_status")
+      .eq("organization_id", orgId)
+      .limit(500),
+    supabase.from("deal_stages").select("id, key, position, kind").eq("organization_id", orgId),
+    supabase.from("org_settings").select("deal_custom_fields").eq("organization_id", orgId).maybeSingle(),
+  ]);
+  const readError = existingTemplates.error ?? existingStages.error ?? settings.error;
   if (readError) return failFromError(readError);
-  const plan = planTemplateInstall(requirements, { templates: existingTemplates ?? [], connections: [] });
+  const existingFields = parseDealFieldDefs(settings.data?.deal_custom_fields);
+  const plan = planTemplateInstall(requirements, {
+    templates: existingTemplates.data ?? [],
+    connections: [],
+    stages: existingStages.data ?? [],
+    dealFields: existingFields,
+  });
 
   const { data: flow, error: flowError } = await supabase
     .from("flows")
@@ -176,7 +191,7 @@ export async function installTemplate(
     return failFromError(version.error);
   }
 
-  let templatesFailed = false;
+  let partial = false;
   for (const wanted of plan.templatesToCreate) {
     const { error } = await supabase.from("message_templates").insert({
       organization_id: orgId,
@@ -186,11 +201,45 @@ export async function installTemplate(
       approval_status: "draft",
     });
     // 23505: someone created it meanwhile, which is what we wanted anyway.
-    if (error && error.code !== "23505") templatesFailed = true;
+    if (error && error.code !== "23505") partial = true;
+  }
+  // Won and lost stages move down first, so the new ones land before them.
+  for (const move of plan.stagesToMove) {
+    const { error } = await supabase
+      .from("deal_stages")
+      .update({ position: move.position })
+      .eq("id", move.id)
+      .eq("organization_id", orgId);
+    if (error) partial = true;
+  }
+  for (const stage of plan.stagesToCreate) {
+    const { error } = await supabase.from("deal_stages").insert({
+      organization_id: orgId,
+      key: stage.key,
+      name: stage.name,
+      kind: stage.kind,
+      position: stage.position,
+    });
+    if (error && error.code !== "23505") partial = true;
+  }
+  if (plan.dealFieldsToCreate.length > 0 && settings.data) {
+    const { error } = await supabase
+      .from("org_settings")
+      .update({ deal_custom_fields: [...existingFields, ...plan.dealFieldsToCreate] as unknown as Json })
+      .eq("organization_id", orgId);
+    if (error) partial = true;
+  } else if (plan.dealFieldsToCreate.length > 0) {
+    // No settings row yet: the fields are listed under "what is missing" until created by hand.
+    partial = true;
+  }
+  if (plan.stagesToCreate.length > 0 || plan.dealFieldsToCreate.length > 0) {
+    revalidatePath("/app/trattative");
+    revalidatePath("/app/impostazioni/fasi");
+    revalidatePath("/app/impostazioni/campi");
   }
 
   refresh(flow.id);
-  redirect(`${BASE}/${flow.id}?installato=${templatesFailed ? "parziale" : "1"}`);
+  redirect(`${BASE}/${flow.id}?installato=${partial ? "parziale" : "1"}`);
 }
 
 /** Asks the worker to simulate a version over the latest matching events. Nothing is sent. */
