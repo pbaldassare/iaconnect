@@ -30,7 +30,7 @@ export default async function AssistantSettingsPage() {
           </span>
         }
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
-        description="Come parla l'IA quando un flusso le fa rispondere a un contatto. Non cambia cosa fanno i flussi."
+        description="Tono e regole libere. Per sedi e orari usa Profilo azienda; per Q&A usa Allenamento IA."
       />
       <SettingsNav current="assistente" />
       {disabled ? (

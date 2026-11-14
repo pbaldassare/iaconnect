@@ -20,6 +20,18 @@ export const SETTINGS_SECTIONS = [
     description: "Tono, istruzioni e frasi fisse dell'IA quando risponde ai contatti.",
   },
   {
+    key: "azienda",
+    href: "/app/impostazioni/azienda",
+    label: "Profilo azienda",
+    description: "Sedi, orari, servizi: i fatti che l'IA deve conoscere su WhatsApp.",
+  },
+  {
+    key: "allenamento",
+    href: "/app/impostazioni/allenamento",
+    label: "Allenamento IA",
+    description: "Domande e risposte addestrate per ogni cliente.",
+  },
+  {
     key: "marchio",
     href: "/app/impostazioni/marchio",
     label: "Marchio",

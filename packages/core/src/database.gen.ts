@@ -1106,6 +1106,8 @@ export interface Database {
           ai_disclosure: string;
           brand: Json;
           deal_custom_fields: Json;
+          business_profile: Json;
+          ai_training: Json;
           created_at: string;
           updated_at: string;
         };
@@ -1119,6 +1121,8 @@ export interface Database {
           ai_disclosure?: string;
           brand?: Json;
           deal_custom_fields?: Json;
+          business_profile?: Json;
+          ai_training?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -1132,6 +1136,8 @@ export interface Database {
           ai_disclosure?: string;
           brand?: Json;
           deal_custom_fields?: Json;
+          business_profile?: Json;
+          ai_training?: Json;
           created_at?: string;
           updated_at?: string;
         };
