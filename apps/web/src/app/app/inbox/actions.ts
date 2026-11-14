@@ -1,7 +1,7 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
-import { parseConsents } from "@/lib/contacts/consents";
-import { hasConsent } from "@/lib/contacts/consents";
+import { grantConsent, hasConsent, parseConsents } from "@/lib/contacts/consents";
+import { parseDirectPhone } from "@/lib/inbox/direct-send";
 import { channelLabel } from "@/lib/customer-labels";
 import { isDemoReadOnly } from "@/lib/demo/client";
 import {
@@ -17,6 +17,7 @@ import { isUuid } from "@/lib/org-selection";
 import { actorOf, requireOrg } from "@/lib/session";
 import type { Json } from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 function refresh(conversationId: string) {
   revalidatePath("/app/inbox");
@@ -101,25 +102,17 @@ export async function markConversationRead(conversationId: string): Promise<void
   else refresh(conversation.id);
 }
 
-/**
- * Operator send path: a `messages` row with `delivery_status = 'queued'`, then a
- * `send_message` job. The worker checks consent, quota and the WhatsApp window and
- * writes the outcome on the message (`sent`… or `failed` + `error`).
- */
-export async function sendMessage(
-  conversationId: string,
-  _prev: ActionResult,
+async function queueOperatorMessage(
+  context: Awaited<ReturnType<typeof requireOrg>>,
+  conversation: NonNullable<Awaited<ReturnType<typeof loadConversation>>["conversation"]>,
   formData: FormData,
 ): Promise<ActionResult> {
-  const { context, conversation } = await loadConversation(conversationId);
-  if (!conversation) return fail(NOT_FOUND);
   const { supabase, org, session } = context;
   const organizationId = org.organization.id;
   const text = (name: string) => {
     const value = formData.get(name);
     return typeof value === "string" ? value.trim() : "";
   };
-
   const channel = conversation.channel;
   let built: OutgoingResult;
   if (usesTemplate(channel, conversation.window_expires_at, text("mode"))) {
@@ -159,7 +152,6 @@ export async function sendMessage(
     actor: actorOf(context),
   });
   if (job.error) {
-    // Without the job nobody would ever send it: say so on the message itself.
     await supabase
       .from("messages")
       .update({
@@ -172,7 +164,6 @@ export async function sendMessage(
     return failFromError(job.error);
   }
 
-  // Writing by hand means a person is following the conversation: the automation steps aside.
   const patch =
     conversation.assignee_type === "user" && conversation.status === "open"
       ? { last_message_at: new Date().toISOString() }
@@ -202,4 +193,128 @@ export async function sendMessage(
     );
   }
   return ok("Messaggio in coda: parte tra pochi secondi. Lo stato si aggiorna qui sotto.");
+}
+
+/**
+ * Operator send path: a `messages` row with `delivery_status = 'queued'`, then a
+ * `send_message` job. The worker checks consent, quota and the WhatsApp window and
+ * writes the outcome on the message (`sent`… or `failed` + `error`).
+ */
+export async function sendMessage(
+  conversationId: string,
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
+  const { context, conversation } = await loadConversation(conversationId);
+  if (!conversation) return fail(NOT_FOUND);
+  return queueOperatorMessage(context, conversation, formData);
+}
+
+const WHATSAPP_CONNECTORS = ["whatsapp_meta", "whatsapp_wawebapi"];
+
+/**
+ * Starts (or reuses) a conversation for a number not yet in the rubric, then queues the message.
+ */
+export async function sendDirectMessage(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const context = await requireOrg();
+  const { supabase, org, session } = context;
+  const organizationId = org.organization.id;
+  const text = (name: string) => {
+    const value = formData.get(name);
+    return typeof value === "string" ? value.trim() : "";
+  };
+  const phone = parseDirectPhone(text("phone"));
+  if (!phone) return fail("Scrivi un numero di cellulare valido.", { phone: "Numero non valido." });
+  const channel = text("channel") || "whatsapp";
+  if (channel !== "whatsapp") {
+    return fail("Per ora è disponibile solo WhatsApp.");
+  }
+  const fullName = text("full_name").slice(0, 120);
+  const registerConsent = text("register_consent") === "1";
+
+  let contactId: string | null = null;
+  const { data: byPhone, error: findError } = await supabase
+    .from("contacts")
+    .select("id, full_name, consents, phones")
+    .eq("organization_id", organizationId)
+    .contains("phones", [phone])
+    .limit(1)
+    .maybeSingle();
+  if (findError) return failFromError(findError);
+  if (byPhone) {
+    contactId = byPhone.id;
+    if (fullName && !byPhone.full_name.trim()) {
+      await supabase.from("contacts").update({ full_name: fullName }).eq("id", contactId).eq("organization_id", organizationId);
+    }
+    if (registerConsent) {
+      const consents = grantConsent(byPhone.consents, "whatsapp", "Invio manuale da inbox");
+      await supabase.from("contacts").update({ consents: consents as Json }).eq("id", contactId).eq("organization_id", organizationId);
+    }
+  } else {
+    const consents = registerConsent
+      ? grantConsent({}, "whatsapp", "Invio manuale da inbox")
+      : {};
+    const { data: created, error: createError } = await supabase
+      .from("contacts")
+      .insert({
+        organization_id: organizationId,
+        full_name: fullName || `Contatto ${phone}`,
+        phones: [phone],
+        emails: [],
+        consents: consents as Json,
+        custom_fields: {},
+      })
+      .select("id")
+      .single();
+    if (createError) return failFromError(createError);
+    contactId = created.id;
+  }
+
+  const { data: connections } = await supabase
+    .from("connections")
+    .select("id, connector_type, status")
+    .eq("organization_id", organizationId)
+    .eq("status", "active");
+  const whatsappConnection =
+    connections?.find((row) => WHATSAPP_CONNECTORS.includes(row.connector_type)) ?? null;
+
+  const { data: existingConv } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("organization_id", organizationId)
+    .eq("contact_id", contactId)
+    .eq("channel", channel)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let conversation = existingConv;
+  if (!conversation) {
+    const { data: inserted, error: convError } = await supabase
+      .from("conversations")
+      .insert({
+        organization_id: organizationId,
+        contact_id: contactId,
+        channel,
+        connection_id: whatsappConnection?.id ?? null,
+        status: "open",
+        assignee_type: "user",
+        assignee_user_id: session.user.id,
+      })
+      .select("*")
+      .single();
+    if (convError) return failFromError(convError);
+    conversation = inserted;
+  } else if (conversation.status === "closed") {
+    await supabase
+      .from("conversations")
+      .update({ status: "open", assignee_type: "user", assignee_user_id: session.user.id })
+      .eq("id", conversation.id)
+      .eq("organization_id", organizationId);
+  }
+
+  if (!text("mode")) formData.set("mode", "template");
+  const result = await queueOperatorMessage(context, conversation, formData);
+  if (!result.ok) return result;
+  redirect(`/app/inbox/${conversation.id}`);
 }

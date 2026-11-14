@@ -128,6 +128,70 @@ export function buildDemoData(now: Date = new Date()): DemoData {
       ai_tone: "Cordiale e professionale, frasi brevi, si dà del lei.",
       ai_instructions:
         "Siamo un'agenzia assicurativa di quartiere. Non comunicare mai prezzi che non compaiono nel preventivo. Per sinistri e disdette passa subito la conversazione a una persona.",
+      business_profile: {
+        summary:
+          "Agenzia Demo è a Desenzano del Garda dal 1987. Ci occupiamo di auto, casa e attività per famiglie e piccole imprese del lago.",
+        openingHours: [
+          { label: "Lun–Ven", hours: "9:00–13:00, 15:00–19:00" },
+          { label: "Sabato", hours: "9:00–12:30" },
+        ],
+        locations: [
+          {
+            name: "Sede centrale",
+            address: "Via del Porto 18, 25015 Desenzano del Garda (BS)",
+            phone: phone(90),
+            hours: "Lun–Ven 9–19, Sab 9–12:30",
+            notes: "Parcheggio riservato nel cortile interno.",
+          },
+          {
+            name: "Sportello Lonato",
+            address: "Piazza Martiri 3, 25017 Lonato (BS)",
+            phone: phone(91),
+            hours: "Mar e Gio 15:00–18:30",
+          },
+        ],
+        services: [
+          "RC auto e moto",
+          "Polizze casa e condominio",
+          "RC professionale",
+          "Infortuni e vita",
+          "Rinnovi e scadenze",
+        ],
+        whatsappTopics: [
+          "Orari e come raggiungerci",
+          "Documenti per un preventivo auto",
+          "Stato di un rinnovo già in corso",
+        ],
+      },
+      ai_training: {
+        notes: "In demo non scaliamo crediti IA. In produzione useremo il wallet del piano.",
+        entries: [
+          {
+            id: demoId(40, 1),
+            topic: "Orari",
+            question: "A che ora aprite?",
+            answer:
+              "Siamo aperti lun–ven 9–13 e 15–19, sabato 9–12:30. Lo sportello di Lonato è attivo mar e gio 15–18:30.",
+            active: true,
+          },
+          {
+            id: demoId(40, 2),
+            topic: "Sedi",
+            question: "Dove vi trovo?",
+            answer:
+              "La sede principale è in Via del Porto 18 a Desenzano. Abbiamo anche lo sportello in Piazza Martiri a Lonato.",
+            active: true,
+          },
+          {
+            id: demoId(40, 3),
+            topic: "Preventivo",
+            question: "Che documenti servono per l'auto?",
+            answer:
+              "Per un preventivo RC auto ci servono targa, data di nascita e codice fiscale del contraente. Può inviarli qui in chat.",
+            active: true,
+          },
+        ],
+      },
       out_of_scope_reply:
         "Per questa richiesta la metto in contatto con un collega dell'agenzia: la richiamiamo in giornata.",
       ai_disclosure: "Questo è un messaggio automatico dell'Agenzia Demo.",

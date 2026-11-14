@@ -15,7 +15,7 @@ export default async function SettingsPage() {
         title="Impostazioni"
         description={
           org.canManage
-            ? "Utenti, modelli di messaggio, assistente IA, marchio e trattative della tua azienda."
+            ? "Utenti, profilo azienda, allenamento IA, modelli di messaggio e trattative."
             : "Le impostazioni della tua azienda. Le modifiche sono riservate ai titolari."
         }
       />

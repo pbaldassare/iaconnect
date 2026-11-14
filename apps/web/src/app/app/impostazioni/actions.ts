@@ -2,7 +2,16 @@
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { buildDealFieldDefs } from "@/lib/deals/stages";
 import { requireOrgManager } from "@/lib/session";
+import {
+  aiTrainingToJson,
+  buildAiTrainingFromForm,
+} from "@/lib/settings/ai-training";
+import {
+  buildBusinessProfileFromForm,
+  businessProfileToJson,
+} from "@/lib/settings/business-profile";
 import { buildOrgBrand } from "@/lib/settings/brand";
+import { randomUUID } from "node:crypto";
 import { type Json, normalizePhone } from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
 
@@ -69,6 +78,36 @@ export async function saveBrand(_prev: ActionResult, formData: FormData): Promis
   if (error) return failFromError(error);
   revalidatePath("/app", "layout");
   return ok("Marchio salvato.");
+}
+
+export async function saveBusinessProfile(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const { supabase, org } = await requireOrgManager();
+  const built = buildBusinessProfileFromForm(formData);
+  if (!built.ok) return fail("Controlla i campi evidenziati.", built.errors);
+  const { error } = await supabase
+    .from("org_settings")
+    .update({ business_profile: businessProfileToJson(built.profile) })
+    .eq("organization_id", org.organization.id);
+  if (error) return failFromError(error);
+  revalidatePath("/app/impostazioni/azienda");
+  revalidatePath("/app/impostazioni/allenamento");
+  return ok("Profilo azienda salvato. L'IA lo userà nelle risposte WhatsApp.");
+}
+
+export async function saveAiTraining(_prev: ActionResult, formData: FormData): Promise<ActionResult> {
+  const { supabase, org } = await requireOrgManager();
+  const built = buildAiTrainingFromForm(formData);
+  if (!built.ok) return fail(built.errors.form ?? "Controlla domande e risposte.");
+  for (const entry of built.training.entries) {
+    if (!entry.id) entry.id = randomUUID();
+  }
+  const { error } = await supabase
+    .from("org_settings")
+    .update({ ai_training: aiTrainingToJson(built.training) })
+    .eq("organization_id", org.organization.id);
+  if (error) return failFromError(error);
+  revalidatePath("/app/impostazioni/allenamento");
+  return ok("Allenamento salvato. Vale dalle prossime risposte automatiche.");
 }
 
 export async function saveDealFields(_prev: ActionResult, formData: FormData): Promise<ActionResult> {

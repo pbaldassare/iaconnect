@@ -2,6 +2,7 @@ import { ConsentSummary } from "@/components/contacts/consent-summary";
 import { FeatureOff } from "@/components/feature-off";
 import { AutoRefresh } from "@/components/inbox/auto-refresh";
 import { Composer } from "@/components/inbox/composer";
+import { DirectSendDialog } from "@/components/inbox/direct-send-dialog";
 import { MarkRead } from "@/components/inbox/mark-read";
 import { ScrollEnd } from "@/components/inbox/scroll-end";
 import { AiBadge, Badge, StatusPill } from "@/components/ui/badge";
@@ -79,7 +80,7 @@ export async function InboxView({ params, selectedId }: { params: Params; select
     withParams("/app/inbox", { ...filterParams, ...extra });
   const threadHref = (id: string) => withParams(`/app/inbox/${id}`, filterParams);
 
-  const [conversationsResult, pendingApprovals] = await Promise.all([
+  const [conversationsResult, pendingApprovals, directTemplatesResult] = await Promise.all([
     supabase
       .from("conversations")
       .select(
@@ -93,7 +94,15 @@ export async function InboxView({ params, selectedId }: { params: Params; select
       .select("id", { count: "exact", head: true })
       .eq("organization_id", organizationId)
       .eq("status", "pending"),
+    supabase
+      .from("message_templates")
+      .select("id, name, body, subject, approval_status")
+      .eq("organization_id", organizationId)
+      .eq("channel", "whatsapp")
+      .eq("approval_status", "approved")
+      .order("name"),
   ]);
+  const directTemplates = directTemplatesResult.data ?? [];
   const conversations = conversationsResult.data ?? [];
 
   const contacts = new Map<string, ContactLite>();
@@ -142,13 +151,16 @@ export async function InboxView({ params, selectedId }: { params: Params; select
           title="Inbox"
           description="Le conversazioni di tutti i canali in un posto solo. Quelle che prendi in carico escono dall'automazione."
           actions={
-            approvalsCount > 0 ? (
-              <ButtonLink href="/app/approvazioni" variant="secondary" size="sm" icon="check">
-                {approvalsCount === 1
-                  ? "1 approvazione in attesa"
-                  : `${approvalsCount} approvazioni in attesa`}
-              </ButtonLink>
-            ) : undefined
+            <div className="flex flex-wrap items-center gap-2">
+              <DirectSendDialog templates={directTemplates} />
+              {approvalsCount > 0 ? (
+                <ButtonLink href="/app/approvazioni" variant="secondary" size="sm" icon="check">
+                  {approvalsCount === 1
+                    ? "1 approvazione in attesa"
+                    : `${approvalsCount} approvazioni in attesa`}
+                </ButtonLink>
+              ) : null}
+            </div>
           }
         />
       </div>
