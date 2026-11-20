@@ -25,8 +25,12 @@ export function buildBusinessProfileFromForm(
   const locPhones = list(formData, "loc_phone");
   const locHours = list(formData, "loc_hours");
   const locNotes = list(formData, "loc_notes");
-  const services = list(formData, "service_line").map((s) => s.trim()).filter(Boolean);
-  const whatsappTopics = list(formData, "wa_topic").map((s) => s.trim()).filter(Boolean);
+  const services = list(formData, "service_line")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const whatsappTopics = list(formData, "wa_topic")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   const openingHours = hourLabels
     .map((label, index) => ({

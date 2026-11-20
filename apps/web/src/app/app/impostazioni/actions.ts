@@ -1,17 +1,11 @@
 "use server";
+import { randomUUID } from "node:crypto";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { buildDealFieldDefs } from "@/lib/deals/stages";
 import { requireOrgManager } from "@/lib/session";
-import {
-  aiTrainingToJson,
-  buildAiTrainingFromForm,
-} from "@/lib/settings/ai-training";
-import {
-  buildBusinessProfileFromForm,
-  businessProfileToJson,
-} from "@/lib/settings/business-profile";
+import { aiTrainingToJson, buildAiTrainingFromForm } from "@/lib/settings/ai-training";
 import { buildOrgBrand } from "@/lib/settings/brand";
-import { randomUUID } from "node:crypto";
+import { buildBusinessProfileFromForm, businessProfileToJson } from "@/lib/settings/business-profile";
 import { type Json, normalizePhone } from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
 
