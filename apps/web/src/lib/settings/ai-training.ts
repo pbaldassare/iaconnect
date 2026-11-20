@@ -1,4 +1,4 @@
-import { AiTrainingSchema, type AiTraining, type Json, parseAiTraining } from "@ia-connect/core";
+import { type AiTraining, AiTrainingSchema, type Json, parseAiTraining } from "@ia-connect/core";
 
 export type { AiTraining };
 
