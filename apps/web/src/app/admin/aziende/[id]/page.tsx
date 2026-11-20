@@ -7,6 +7,7 @@ import { organizationStatus, sectorLabel } from "@/lib/labels";
 import { firstParam } from "@/lib/pagination";
 import { requireStaffForOrg } from "@/lib/session";
 import type { Metadata } from "next";
+import { ConversationsSection } from "./conversations";
 import {
   ConnectionsSection,
   DataSection,
@@ -29,6 +30,7 @@ const TABS = [
   { key: "funzioni", label: "Funzioni" },
   { key: "personalizzazioni", label: "Personalizzazioni" },
   { key: "assistenza", label: "Assistenza e dati" },
+  { key: "conversazioni", label: "Conversazioni" },
 ] as const;
 type TabKey = (typeof TABS)[number]["key"];
 
@@ -86,6 +88,9 @@ export default async function OrganizationPage({
       {tab === "funzioni" ? <FeaturesSection {...context} /> : null}
       {tab === "personalizzazioni" ? <SettingsSection {...context} /> : null}
       {tab === "assistenza" ? <SupportSection {...context} /> : null}
+      {tab === "conversazioni" ? (
+        <ConversationsSection {...context} conversationId={firstParam(query.conversazione)} />
+      ) : null}
     </>
   );
 }
