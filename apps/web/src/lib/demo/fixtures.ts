@@ -263,7 +263,7 @@ export function buildDemoData(now: Date = new Date()): DemoData {
       "whatsapp_wawebapi",
       "whatsapp",
       "WhatsApp via QR (waWebApi)",
-      "Collega il numero inquadrando un codice QR.",
+      "Numero già collegato su waWebApi: id istanza e token Bearer.",
       "qr",
     ),
     connectorType(

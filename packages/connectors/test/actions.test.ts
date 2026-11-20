@@ -457,26 +457,138 @@ describe("Gmail", () => {
 
 describe("other connectors", () => {
   it("waWebApi sends the rendered text of a template", async () => {
-    const { fetch, calls } = fakeFetch(() => json({ id: "msg-1" }));
+    const { fetch, calls } = fakeFetch(() =>
+      json({
+        success: true,
+        data: { key: { remoteJid: "393331234567@s.whatsapp.net", fromMe: true, id: "BAE54E95D9C9B31F" } },
+      }),
+    );
     const context = makeContext({
       connectorKey: "whatsapp_wawebapi",
-      config: { sessionId: "ia-test" },
-      secrets: { apiKey: "gateway-key", webhookSecret: "w" },
+      config: { instanceId: "xZ8cOwc3ZvJ7D4DL", baseUrl: "https://wa.example.com/sessionStatus/abc" },
+      secrets: { apiKey: "gateway-key" },
       fetch,
-      env: { WAWEBAPI_BASE_URL: "https://wa.example.com/" },
     });
     const result = await whatsappWaWebApiConnector.actions.sendTemplate!.execute(context, {
       to: "3331234567",
       template: "preventivo",
       renderedText: "Ciao Mario, il preventivo è pronto",
     });
-    expect(result.externalId).toBe("msg-1");
-    expect(calls[0]!.url).toBe("https://wa.example.com/sessions/ia-test/messages");
-    expect(calls[0]!.headers["x-api-key"]).toBe("gateway-key");
+    expect(result.externalId).toBe("BAE54E95D9C9B31F");
+    expect(calls[0]!.url).toBe("https://wa.example.com/api/message/text");
+    expect(calls[0]!.headers.authorization).toBe("Bearer gateway-key");
     expect(JSON.parse(calls[0]!.body!)).toEqual({
-      to: "393331234567",
-      text: "Ciao Mario, il preventivo è pronto",
+      instanceId: "xZ8cOwc3ZvJ7D4DL",
+      recipient: "393331234567",
+      message: "Ciao Mario, il preventivo è pronto",
     });
+  });
+
+  it("waWebApi reports a disconnected phone as a retryable failure", async () => {
+    const { fetch } = fakeFetch(() => json({ message: "offline" }, 503));
+    const context = makeContext({
+      connectorKey: "whatsapp_wawebapi",
+      config: { instanceId: "inst-1", baseUrl: "https://wa.example.com" },
+      secrets: { apiKey: "gateway-key" },
+      fetch,
+    });
+    const error = await failure(
+      whatsappWaWebApiConnector.actions.sendText!.execute(context, { to: "+393331234567", text: "Ciao" }),
+    );
+    expect(error.retryable).toBe(true);
+    expect(error.options.code).toBe("device_offline");
+  });
+
+  it("waWebApi maps an inbound message, a delivery receipt and a closed session", async () => {
+    const context = makeContext({
+      connectorKey: "whatsapp_wawebapi",
+      config: { instanceId: "inst-1", baseUrl: "https://wa.example.com" },
+      secrets: { apiKey: "gateway-key" },
+    });
+    const post = (body: unknown) =>
+      whatsappWaWebApiConnector.handleWebhook!(context, {
+        method: "POST",
+        headers: {},
+        query: {},
+        rawBody: JSON.stringify(body),
+      });
+    const inbound = await post({
+      type: "message",
+      body: {
+        key: { remoteJid: "393331234567@s.whatsapp.net", fromMe: false, id: "IN1" },
+        messageTimestamp: 1669410173,
+        pushName: "Mario Rossi",
+        message: { conversation: "Buongiorno" },
+      },
+    });
+    expect(inbound.verified).toBe(true);
+    expect(inbound.events).toEqual([
+      {
+        type: "whatsapp.message.received",
+        occurredAt: "2022-11-25T21:02:53.000Z",
+        dedupeKey: "whatsapp_wawebapi:msg:IN1",
+        payload: { from: "+393331234567", fromName: "Mario Rossi", text: "Buongiorno", messageId: "IN1" },
+        contact: { name: "Mario Rossi", phone: "+393331234567" },
+      },
+    ]);
+    const own = await post({
+      type: "message",
+      body: {
+        key: { remoteJid: "393331234567@s.whatsapp.net", fromMe: true, id: "OUT" },
+        message: { conversation: "noi" },
+      },
+    });
+    expect(own.events).toEqual([]);
+    const lid = await post({
+      type: "message",
+      body: {
+        key: { remoteJid: "190985149661200@lid", fromMe: false, id: "LID1" },
+        message: { conversation: "ciao" },
+      },
+    });
+    expect(lid.events).toEqual([]);
+    const receipt = await post({
+      type: "message_update",
+      body: [
+        {
+          key: { remoteJid: "393331234567@s.whatsapp.net", id: "OUT1", fromMe: true },
+          update: { status: 3 },
+        },
+      ],
+    });
+    expect(receipt.events).toEqual([
+      {
+        type: "whatsapp.status.updated",
+        dedupeKey: "whatsapp_wawebapi:status:OUT1:delivered",
+        payload: { messageId: "OUT1", status: "delivered" },
+      },
+    ]);
+    const closed = await post({ type: "connection", body: { connection: "close" } });
+    expect(closed.events).toEqual([]);
+    expect(context.saved).toEqual([{ apiKey: "gateway-key", linkState: "close" }]);
+    expect(await whatsappWaWebApiConnector.verify({ ...context, secrets: context.saved[0]! })).toMatchObject({
+      status: "expired",
+    });
+    expect(
+      (
+        await whatsappWaWebApiConnector.handleWebhook!(context, {
+          method: "GET",
+          headers: {},
+          query: {},
+          rawBody: "",
+        })
+      ).verified,
+    ).toBe(false);
+  });
+
+  it("waWebApi refuses a private gateway address", async () => {
+    const error = await failure(
+      whatsappWaWebApiConnector.connect(
+        { apiKey: "k", instanceId: "inst-1", baseUrl: "http://127.0.0.1:3000" },
+        { fetch: fakeFetch(() => json({})).fetch, env: {} },
+      ),
+    );
+    expect(error.retryable).toBe(false);
   });
 
   it("Twilio sends a form-encoded message with basic auth", async () => {
