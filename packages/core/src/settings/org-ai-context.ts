@@ -18,10 +18,7 @@ export const BusinessProfileSchema = z.object({
   openingHours: z.array(hoursRow).max(14).default([]),
   locations: z.array(locationRow).max(20).default([]),
   services: z.array(z.string().trim().min(1).max(120)).max(30).default([]),
-  whatsappTopics: z
-    .array(z.string().trim().min(1).max(160))
-    .max(20)
-    .default([]),
+  whatsappTopics: z.array(z.string().trim().min(1).max(160)).max(20).default([]),
 });
 
 export type BusinessProfile = z.infer<typeof BusinessProfileSchema>;

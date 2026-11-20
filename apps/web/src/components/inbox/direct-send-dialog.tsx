@@ -1,11 +1,11 @@
 "use client";
+import { sendDirectMessage } from "@/app/app/inbox/actions";
+import type { ComposerTemplate } from "@/components/inbox/composer";
 import { Dialog } from "@/components/ui/dialog";
 import { Field } from "@/components/ui/field";
 import { ActionForm, SubmitButton, useActionResult } from "@/components/ui/form";
 import { FormMessage, Notice } from "@/components/ui/form-message";
 import { Checkbox, Input, Select } from "@/components/ui/input";
-import type { ComposerTemplate } from "@/components/inbox/composer";
-import { sendDirectMessage } from "@/app/app/inbox/actions";
 import { placeholderIndexes, variableCount } from "@/lib/message-templates";
 import { useState } from "react";
 
@@ -60,8 +60,20 @@ function DirectSendForm({
       <FormMessage result={result} />
       <input type="hidden" name="channel" value="whatsapp" />
       <input type="hidden" name="mode" value="template" />
-      <Field label="Cellulare" htmlFor="direct-phone" name="phone" hint="Con prefisso internazionale, es. +39 333 1234567">
-        <Input id="direct-phone" name="phone" type="tel" required autoComplete="tel" placeholder="+39 333 1234567" />
+      <Field
+        label="Cellulare"
+        htmlFor="direct-phone"
+        name="phone"
+        hint="Con prefisso internazionale, es. +39 333 1234567"
+      >
+        <Input
+          id="direct-phone"
+          name="phone"
+          type="tel"
+          required
+          autoComplete="tel"
+          placeholder="+39 333 1234567"
+        />
       </Field>
       <Field label="Nome (facoltativo)" htmlFor="direct-name" name="full_name" optional>
         <Input id="direct-name" name="full_name" maxLength={120} placeholder="Es. Mario Rossi" />
@@ -99,7 +111,9 @@ function DirectSendForm({
             </Select>
           </Field>
           {template ? (
-            <p className="rounded-lg bg-surface-2 p-3 text-sm text-muted whitespace-pre-wrap">{template.body}</p>
+            <p className="rounded-lg bg-surface-2 p-3 text-sm text-muted whitespace-pre-wrap">
+              {template.body}
+            </p>
           ) : null}
           {count > 0 && template ? (
             <ul className="grid gap-2">

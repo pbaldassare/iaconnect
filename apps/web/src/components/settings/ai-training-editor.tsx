@@ -39,8 +39,8 @@ export function AiTrainingEditor({ initial, disabled }: { initial: AiTraining; d
       <div className="grid gap-3">
         <h2 className="font-display text-[15px] font-bold">Domande e risposte addestrate</h2>
         <p className="text-sm text-muted">
-          Quando un contatto fa una domanda simile, l&apos;IA usa queste risposte come riferimento (insieme al profilo
-          azienda).
+          Quando un contatto fa una domanda simile, l&apos;IA usa queste risposte come riferimento (insieme al
+          profilo azienda).
         </p>
         <ul className="grid gap-4">
           {rows.map((row, index) => (

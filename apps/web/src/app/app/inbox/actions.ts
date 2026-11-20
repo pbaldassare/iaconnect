@@ -1,9 +1,9 @@
 "use server";
 import { type ActionResult, fail, failFromError, ok } from "@/lib/action";
 import { grantConsent, hasConsent, parseConsents } from "@/lib/contacts/consents";
-import { parseDirectPhone } from "@/lib/inbox/direct-send";
 import { channelLabel } from "@/lib/customer-labels";
 import { isDemoReadOnly } from "@/lib/demo/client";
+import { parseDirectPhone } from "@/lib/inbox/direct-send";
 import {
   type OutgoingResult,
   buildFreeMessage,
@@ -244,16 +244,22 @@ export async function sendDirectMessage(_prev: ActionResult, formData: FormData)
   if (byPhone) {
     contactId = byPhone.id;
     if (fullName && !byPhone.full_name.trim()) {
-      await supabase.from("contacts").update({ full_name: fullName }).eq("id", contactId).eq("organization_id", organizationId);
+      await supabase
+        .from("contacts")
+        .update({ full_name: fullName })
+        .eq("id", contactId)
+        .eq("organization_id", organizationId);
     }
     if (registerConsent) {
       const consents = grantConsent(byPhone.consents, "whatsapp", "Invio manuale da inbox");
-      await supabase.from("contacts").update({ consents: consents as Json }).eq("id", contactId).eq("organization_id", organizationId);
+      await supabase
+        .from("contacts")
+        .update({ consents: consents as Json })
+        .eq("id", contactId)
+        .eq("organization_id", organizationId);
     }
   } else {
-    const consents = registerConsent
-      ? grantConsent({}, "whatsapp", "Invio manuale da inbox")
-      : {};
+    const consents = registerConsent ? grantConsent({}, "whatsapp", "Invio manuale da inbox") : {};
     const { data: created, error: createError } = await supabase
       .from("contacts")
       .insert({
