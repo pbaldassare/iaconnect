@@ -167,7 +167,7 @@ export function buildDemoData(now: Date = new Date()): DemoData {
         notes: "In demo non scaliamo crediti IA. In produzione useremo il wallet del piano.",
         entries: [
           {
-            id: demoId(40, 1),
+            id: "a1000001-1111-4000-8000-000000000001",
             topic: "Orari",
             question: "A che ora aprite?",
             answer:
@@ -175,7 +175,7 @@ export function buildDemoData(now: Date = new Date()): DemoData {
             active: true,
           },
           {
-            id: demoId(40, 2),
+            id: "a1000002-1111-4000-8000-000000000002",
             topic: "Sedi",
             question: "Dove vi trovo?",
             answer:
@@ -183,7 +183,7 @@ export function buildDemoData(now: Date = new Date()): DemoData {
             active: true,
           },
           {
-            id: demoId(40, 3),
+            id: "a1000003-1111-4000-8000-000000000003",
             topic: "Preventivo",
             question: "Che documenti servono per l'auto?",
             answer:

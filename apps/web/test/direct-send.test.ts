@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { parseDirectPhone } from "@/lib/inbox/direct-send";
+import { describe, expect, it } from "vitest";
 
 describe("parseDirectPhone", () => {
   it("accepts an international mobile number", () => {
