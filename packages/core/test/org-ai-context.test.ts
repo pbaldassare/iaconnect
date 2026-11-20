@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildOrgAiInstructions, parseBusinessProfile, parseAiTraining } from "../src/settings/org-ai-context.ts";
+import {
+  buildOrgAiInstructions,
+  parseAiTraining,
+  parseBusinessProfile,
+} from "../src/settings/org-ai-context.ts";
 
 describe("org-ai-context", () => {
   it("parses empty profile", () => {
