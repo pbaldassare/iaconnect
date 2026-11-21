@@ -77,6 +77,31 @@ export function buildCatalog(
     }));
 }
 
+/**
+ * Mail connectors kept out of the customer catalog for now. IA Connect is used
+ * to connect WhatsApp; the connectors themselves stay in the engine and in the
+ * admin catalog. Not a per-organization setting.
+ */
+export const CUSTOMER_CATALOG_HIDDEN_KEYS = ["gmail", "microsoft365", "imap_smtp"] as const;
+
+/** True when this connector is hidden from the customer catalog for now. */
+export function isHiddenFromCustomerCatalog(key: string): boolean {
+  return (CUSTOMER_CATALOG_HIDDEN_KEYS as readonly string[]).includes(key);
+}
+
+/**
+ * Customer-facing catalog: `buildCatalog` minus the connectors hidden for now.
+ * A category left with no entries is dropped, so the mail group disappears.
+ */
+export function customerCatalog(groups: readonly CatalogGroup[]): CatalogGroup[] {
+  return groups
+    .map((group) => ({
+      ...group,
+      entries: group.entries.filter((entry) => !isHiddenFromCustomerCatalog(entry.key)),
+    }))
+    .filter((group) => group.entries.length > 0);
+}
+
 /** Connector categories governed by a feature flag of `org_features` (lib/features.ts). */
 const CATEGORY_FEATURES: Record<string, string> = {
   social: "social",

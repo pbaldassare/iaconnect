@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Notice } from "@/components/ui/form-message";
 import { PageHeader } from "@/components/ui/page-header";
 import { canConnect } from "@/lib/connections/access";
-import { connectModeLabel } from "@/lib/connections/catalog";
+import { connectModeLabel, isHiddenFromCustomerCatalog } from "@/lib/connections/catalog";
 import { schemaToFields } from "@/lib/connections/form-fields";
 import { connectHelp } from "@/lib/connections/help";
 import { isUuid } from "@/lib/org-selection";
@@ -65,8 +65,9 @@ export default async function NewConnectionPage({
       <div className="grid max-w-2xl gap-5">
         {!allowed ? (
           <Notice tone="warning" title="Non disponibile">
-            Questo collegamento non è compreso nel piano o nelle funzioni attive della tua azienda. Chiedi
-            all'assistenza di attivarlo.
+            {isHiddenFromCustomerCatalog(connector.key)
+              ? "Per adesso da qui si collega WhatsApp."
+              : "Questo collegamento non è compreso nel piano o nelle funzioni attive della tua azienda. Chiedi all'assistenza di attivarlo."}
           </Notice>
         ) : !context.demo && !hasServiceKey() ? (
           <Notice tone="error" title="Il server non è pronto per creare collegamenti">
