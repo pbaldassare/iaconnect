@@ -6,10 +6,10 @@ import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Notice } from "@/components/ui/form-message";
 import { PageHeader } from "@/components/ui/page-header";
 import { errorMessage } from "@/lib/action";
-import { buildOrgAiInstructions } from "@ia-connect/core";
 import { requireOrg } from "@/lib/session";
 import { aiTrainingFormValues } from "@/lib/settings/ai-training";
 import { businessProfileFormValues } from "@/lib/settings/business-profile";
+import { buildOrgAiInstructions } from "@ia-connect/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { saveAiTraining } from "../actions";
@@ -43,7 +43,7 @@ export default async function AiTrainingPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Insegna all'IA come rispondere su WhatsApp: domande frequenti e risposte verificate, per ogni cliente."
       />
-      <SettingsNav current="allenamento" />
+      <SettingsNav current="allenamento" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}
@@ -55,12 +55,15 @@ export default async function AiTrainingPage() {
         </Notice>
       ) : null}
       <Notice tone="neutral" className="mb-4">
-        <strong>Wallet crediti IA:</strong> in produzione collegheremo qui il wallet con i consumi del piano. Per ora non
-        viene scalato nulla in questa schermata.
+        <strong>Wallet crediti IA:</strong> in produzione collegheremo qui il wallet con i consumi del piano.
+        Per ora non viene scalato nulla in questa schermata.
       </Notice>
       <Notice tone="neutral" className="mb-4">
-        Prima compila {" "}
-        <Link href="/app/impostazioni/azienda" className="font-medium text-accent underline-offset-2 hover:underline">
+        Prima compila{" "}
+        <Link
+          href="/app/impostazioni/azienda"
+          className="font-medium text-accent underline-offset-2 hover:underline"
+        >
           Profilo azienda
         </Link>{" "}
         (sedi e orari), poi aggiungi qui le risposte tipo.
@@ -78,7 +81,9 @@ export default async function AiTrainingPage() {
       {preview ? (
         <Card className="mt-6 max-w-3xl">
           <h2 className="mb-2 font-display text-[15px] font-bold">Anteprima contesto IA</h2>
-          <p className="mb-3 text-sm text-muted">Così viene riassunto al modello (senza dati del contatto).</p>
+          <p className="mb-3 text-sm text-muted">
+            Così viene riassunto al modello (senza dati del contatto).
+          </p>
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-4 text-sm leading-relaxed">
             {preview}
           </pre>

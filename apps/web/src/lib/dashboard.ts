@@ -41,7 +41,7 @@ export function dealsByStage(
 }
 
 export interface OnboardingStep {
-  key: "mail" | "whatsapp" | "flow";
+  key: "whatsapp";
   title: string;
   description: string;
   href: string;
@@ -49,36 +49,20 @@ export interface OnboardingStep {
 }
 
 /**
- * First steps for a new customer: connect mail and WhatsApp, then install a flow.
+ * First step for a new customer: connect WhatsApp.
+ * Mail and flow installation are out of this journey for now.
  * `connections` carry the connector category (joined from connector_types).
  */
 export function onboardingSteps(
   connections: readonly { status: string; category: string | null }[],
-  flows: readonly { status: string }[],
 ): OnboardingStep[] {
-  const connected = (category: string) =>
-    connections.some((c) => c.category === category && c.status === "active");
   return [
-    {
-      key: "mail",
-      title: "Collega la mail",
-      description: "Le richieste che arrivano in casella fanno partire i flussi.",
-      href: "/app/collegamenti",
-      done: connected("mail"),
-    },
     {
       key: "whatsapp",
       title: "Collega WhatsApp",
       description: "È il canale con cui i flussi rispondono ai tuoi clienti.",
       href: "/app/collegamenti",
-      done: connected("whatsapp"),
-    },
-    {
-      key: "flow",
-      title: "Installa un flusso",
-      description: "Scegli un modello pronto per il tuo settore, provalo in simulazione e attivalo.",
-      href: "/app/flussi",
-      done: flows.some((f) => f.status === "active"),
+      done: connections.some((c) => c.category === "whatsapp" && c.status === "active"),
     },
   ];
 }

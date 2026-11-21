@@ -51,7 +51,7 @@ export default async function TemplatesSettingsPage({
           ) : undefined
         }
       />
-      <SettingsNav current="modelli" />
+      <SettingsNav current="modelli" canManage={org.canManage} />
       {!org.canManage ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

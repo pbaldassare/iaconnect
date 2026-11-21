@@ -1,18 +1,25 @@
 import { CopyBlock } from "@/components/connections/copy-button";
 import { StatusPill } from "@/components/ui/badge";
-import { buttonClass } from "@/components/ui/button";
+import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Notice } from "@/components/ui/form-message";
 import { PageHeader } from "@/components/ui/page-header";
 import { canConnect } from "@/lib/connections/access";
-import { availablePages, configSummary, connectModeLabel, webhookExample } from "@/lib/connections/catalog";
+import {
+  availablePages,
+  configSummary,
+  connectModeLabel,
+  isHiddenFromCustomerCatalog,
+  webhookExample,
+} from "@/lib/connections/catalog";
+import { showsRecoverySheet } from "@/lib/connections/recovery";
 import { hasOwnWebhook, webhookUrlOf } from "@/lib/connections/server";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { connectionStatus, connectorCategoryLabel } from "@/lib/labels";
 import { isUuid } from "@/lib/org-selection";
 import { firstParam } from "@/lib/pagination";
 import { requireOrg } from "@/lib/session";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConnectionActions } from "../connection-actions";
@@ -76,6 +83,13 @@ export default async function ConnectionPage({
         title={connection.name}
         context={type ? `${type.name} · ${connectorCategoryLabel(type.category)}` : connection.connector_type}
         back={{ href: "/app/collegamenti", label: "Collegamenti" }}
+        actions={
+          org.canManage && showsRecoverySheet(connection.connector_type, mode) ? (
+            <ButtonLink href={`/app/collegamenti/${connection.id}/ripristino`} variant="secondary">
+              Dati per il ripristino
+            </ButtonLink>
+          ) : undefined
+        }
       />
       <div className="grid max-w-3xl gap-5">
         {outcome === "collegato" || outcome === "ricollegato" ? (
@@ -94,7 +108,9 @@ export default async function ConnectionPage({
             {connection.last_error ?? "I flussi che lo usano sono fermi."}{" "}
             {reconnectHref
               ? "Ricollegalo per farli ripartire."
-              : "Chiedi a chi gestisce l'azienda di ricollegarlo."}
+              : org.canManage && isHiddenFromCustomerCatalog(connection.connector_type)
+                ? "Per adesso questo tipo di collegamento non si rifà da qui."
+                : "Chiedi a chi gestisce l'azienda di ricollegarlo."}
           </Notice>
         ) : null}
 

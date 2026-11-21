@@ -32,7 +32,7 @@ export default async function AssistantSettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Tono e regole libere. Per sedi e orari usa Profilo azienda; per Q&A usa Allenamento IA."
       />
-      <SettingsNav current="assistente" />
+      <SettingsNav current="assistente" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

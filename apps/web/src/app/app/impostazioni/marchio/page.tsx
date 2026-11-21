@@ -29,7 +29,7 @@ export default async function BrandSettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Come compare la tua azienda in questa applicazione e a chi arrivano gli avvisi per il titolare."
       />
-      <SettingsNav current="marchio" />
+      <SettingsNav current="marchio" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

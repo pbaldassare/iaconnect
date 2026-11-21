@@ -38,6 +38,7 @@ const ADMIN_NAV: readonly AdminNavItem[] = [
   { href: "/admin/rivenditori", label: "Rivenditori", icon: "people", platformOnly: true },
   { href: "/admin/monitoraggio", label: "Monitoraggio", icon: "pulse", platformOnly: true },
   { href: "/admin/registro", label: "Registro", icon: "list", platformOnly: false },
+  { href: "/admin/api", label: "API", icon: "plug", platformOnly: true },
 ];
 
 export interface AdminRoles {

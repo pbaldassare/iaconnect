@@ -79,6 +79,10 @@ platform (noi)
 Regole:
 
 - Isolamento per `organization_id` con RLS su **ogni** tabella di dati cliente.
+- Un cliente è un'`organization`. Non esiste codice per un cliente specifico.
+- Lo storico dei messaggi è `conversations` e `messages`. Il cliente lo vede
+  nell'Inbox, l'admin nella scheda azienda, le altre piattaforme dall'API di
+  lettura (`docs/moduli/api.md`).
 - L'accesso in assistenza dell'admin è tracciato in `audit_log` e visibile al cliente.
 - Le personalizzazioni per azienda sono righe in `org_settings` e flag in
   `org_features`, mai codice dedicato.

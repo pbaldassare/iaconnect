@@ -48,6 +48,7 @@ describe("admin navigation", () => {
       "Rivenditori",
       "Monitoraggio",
       "Registro",
+      "API",
     ]);
   });
 
@@ -93,6 +94,7 @@ describe("canAccessAdminPath", () => {
     expect(canAccessAdminPath(reseller, "/admin/piani")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/rivenditori")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/monitoraggio")).toBe(false);
+    expect(canAccessAdminPath(reseller, "/admin/api")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/qualcosa-di-nuovo")).toBe(false);
   });
 
@@ -154,6 +156,10 @@ describe("route protection", () => {
     expect(isProtectedPath("/assets-private")).toBe(true);
     expect(isProtectedPath("/imposta-password")).toBe(true);
     expect(isProtectedPath("/accedi")).toBe(false);
+    expect(isProtectedPath("/api/v1/organizations")).toBe(false);
+    expect(isProtectedPath("/api/v1")).toBe(false);
+    expect(isProtectedPath("/api/v10/organizations")).toBe(true);
+    expect(isProtectedPath("/api/oauth/gmail/start")).toBe(true);
     expect(isProtectedPath("/auth/callback")).toBe(false);
     expect(isProtectedPath("/auth/conferma")).toBe(false);
     expect(isProtectedPath("/accedi-finto")).toBe(true);

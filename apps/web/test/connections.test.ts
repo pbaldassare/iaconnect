@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { listConnectors } from "@ia-connect/connectors";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -8,6 +10,7 @@ import {
   configSummary,
   connectionWebhookUrl,
   connectorErrorMessage,
+  customerCatalog,
   defaultConnectionName,
   revealableSecrets,
   sanitizeConfig,
@@ -24,6 +27,26 @@ import { createOAuthState, verifyOAuthState } from "../src/lib/connections/oauth
 import { describeRecipe, describeRecipeStep, intervalLabel } from "../src/lib/scrape/describe";
 
 const toJson = (schema: z.ZodType) => z.toJSONSchema(schema, { io: "input", unrepresentable: "any" });
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? sourceFiles(join(dir, entry.name)) : [join(dir, entry.name)],
+  );
+}
+
+describe("web connector imports", () => {
+  it("does not statically import the Node connector registry", () => {
+    const root = join(import.meta.dirname, "..", "src");
+    const offenders: string[] = [];
+    for (const file of sourceFiles(root)) {
+      if (!file.endsWith(".ts") && !file.endsWith(".tsx")) continue;
+      const source = readFileSync(file, "utf8");
+      if (/from\s+"@ia-connect\/connectors"/.test(source)) offenders.push(file);
+      if (/import\s*\(\s*"@ia-connect\/connectors"\s*\)/.test(source)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("JSON schema → form fields", () => {
   const schema = z.object({
@@ -302,6 +325,36 @@ describe("catalog", () => {
       futuro: "coming",
       meta_social: "plan",
     });
+  });
+
+  it("hides mail connectors from the customer catalog and drops the empty group", () => {
+    const groups = buildCatalog(
+      [
+        type("whatsapp_wawebapi", "whatsapp"),
+        type("whatsapp_meta", "whatsapp"),
+        type("gmail", "mail"),
+        type("microsoft365", "mail"),
+        type("imap_smtp", "mail"),
+        type("webhook_inbound", "crm"),
+      ],
+      "base",
+      new Set([
+        "whatsapp_meta",
+        "whatsapp_wawebapi",
+        "gmail",
+        "microsoft365",
+        "imap_smtp",
+        "webhook_inbound",
+      ]),
+    );
+    const customer = customerCatalog(groups);
+    expect(customer.map((group) => group.category)).toEqual(["whatsapp", "crm"]);
+    expect(customer.flatMap((group) => group.entries.map((entry) => entry.key))).toEqual([
+      "whatsapp_meta",
+      "whatsapp_wawebapi",
+      "webhook_inbound",
+    ]);
+    expect(groups.flatMap((group) => group.entries.map((entry) => entry.key))).toContain("gmail");
   });
 
   it("derives blocked categories from feature flags", () => {

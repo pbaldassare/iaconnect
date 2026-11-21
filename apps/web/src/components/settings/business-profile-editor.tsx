@@ -20,7 +20,7 @@ export function BusinessProfileEditor({
     ),
   );
   const [locations, setLocations] = useState<LocRow[]>(() =>
-  (initial.locations.length ? initial.locations : [{ name: "", address: "" }]).map((row, id) => ({
+    (initial.locations.length ? initial.locations : [{ name: "", address: "" }]).map((row, id) => ({
       ...row,
       id,
     })),
@@ -91,7 +91,13 @@ export function BusinessProfileEditor({
           ))}
         </ul>
         {disabled ? null : (
-          <Button type="button" variant="secondary" size="sm" icon="plus" onClick={() => setHours((r) => [...r, { label: "", hours: "", id: bump() }])}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={() => setHours((r) => [...r, { label: "", hours: "", id: bump() }])}
+          >
             Aggiungi fascia oraria
           </Button>
         )}
@@ -102,15 +108,52 @@ export function BusinessProfileEditor({
         <ul className="grid gap-4">
           {locations.map((row, index) => (
             <li key={row.id} className="grid gap-2 rounded-lg border border-line p-3">
-              <Input name="loc_name" defaultValue={row.name} placeholder="Nome sede" maxLength={80} disabled={disabled} aria-label={`Nome sede ${index + 1}`} />
-              <Input name="loc_address" defaultValue={row.address} placeholder="Indirizzo completo" maxLength={200} disabled={disabled} aria-label={`Indirizzo ${index + 1}`} />
+              <Input
+                name="loc_name"
+                defaultValue={row.name}
+                placeholder="Nome sede"
+                maxLength={80}
+                disabled={disabled}
+                aria-label={`Nome sede ${index + 1}`}
+              />
+              <Input
+                name="loc_address"
+                defaultValue={row.address}
+                placeholder="Indirizzo completo"
+                maxLength={200}
+                disabled={disabled}
+                aria-label={`Indirizzo ${index + 1}`}
+              />
               <div className="grid gap-2 sm:grid-cols-2">
-                <Input name="loc_phone" defaultValue={row.phone ?? ""} placeholder="Telefono (facoltativo)" maxLength={40} disabled={disabled} />
-                <Input name="loc_hours" defaultValue={row.hours ?? ""} placeholder="Orari sportello (facoltativo)" maxLength={120} disabled={disabled} />
+                <Input
+                  name="loc_phone"
+                  defaultValue={row.phone ?? ""}
+                  placeholder="Telefono (facoltativo)"
+                  maxLength={40}
+                  disabled={disabled}
+                />
+                <Input
+                  name="loc_hours"
+                  defaultValue={row.hours ?? ""}
+                  placeholder="Orari sportello (facoltativo)"
+                  maxLength={120}
+                  disabled={disabled}
+                />
               </div>
-              <Input name="loc_notes" defaultValue={row.notes ?? ""} placeholder="Note (parcheggio, accesso, ecc.)" maxLength={300} disabled={disabled} />
+              <Input
+                name="loc_notes"
+                defaultValue={row.notes ?? ""}
+                placeholder="Note (parcheggio, accesso, ecc.)"
+                maxLength={300}
+                disabled={disabled}
+              />
               {disabled ? null : (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setLocations((rows) => rows.filter((item) => item.id !== row.id))}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setLocations((rows) => rows.filter((item) => item.id !== row.id))}
+                >
                   Togli sede
                 </Button>
               )}
@@ -118,7 +161,13 @@ export function BusinessProfileEditor({
           ))}
         </ul>
         {disabled ? null : (
-          <Button type="button" variant="secondary" size="sm" icon="plus" onClick={() => setLocations((r) => [...r, { name: "", address: "", id: bump() }])}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={() => setLocations((r) => [...r, { name: "", address: "", id: bump() }])}
+          >
             Aggiungi sede
           </Button>
         )}
@@ -139,7 +188,12 @@ export function BusinessProfileEditor({
                 aria-label={`Servizio ${index + 1}`}
               />
               {disabled ? null : (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setServices((rows) => rows.filter((item) => item.id !== row.id))}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setServices((rows) => rows.filter((item) => item.id !== row.id))}
+                >
                   Togli
                 </Button>
               )}
@@ -147,7 +201,13 @@ export function BusinessProfileEditor({
           ))}
         </ul>
         {disabled ? null : (
-          <Button type="button" variant="secondary" size="sm" icon="plus" onClick={() => setServices((r) => [...r, { line: "", id: bump() }])}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={() => setServices((r) => [...r, { line: "", id: bump() }])}
+          >
             Aggiungi servizio
           </Button>
         )}
@@ -155,13 +215,28 @@ export function BusinessProfileEditor({
 
       <div className="grid gap-3">
         <h2 className="font-display text-[15px] font-bold">Su WhatsApp può spiegare</h2>
-        <p className="text-sm text-muted">Argomenti che l'IA può trattare in autonomia (orari, sedi, preventivi generici…).</p>
+        <p className="text-sm text-muted">
+          Argomenti che l'IA può trattare in autonomia (orari, sedi, preventivi generici…).
+        </p>
         <ul className="grid gap-2">
           {topics.map((row, index) => (
             <li key={row.id} className="flex gap-2">
-              <Input name="wa_topic" defaultValue={row.line} placeholder="Es. Orari e come raggiungerci" maxLength={160} disabled={disabled} className="flex-1" aria-label={`Argomento ${index + 1}`} />
+              <Input
+                name="wa_topic"
+                defaultValue={row.line}
+                placeholder="Es. Orari e come raggiungerci"
+                maxLength={160}
+                disabled={disabled}
+                className="flex-1"
+                aria-label={`Argomento ${index + 1}`}
+              />
               {disabled ? null : (
-                <Button type="button" variant="ghost" size="sm" onClick={() => setTopics((rows) => rows.filter((item) => item.id !== row.id))}>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setTopics((rows) => rows.filter((item) => item.id !== row.id))}
+                >
                   Togli
                 </Button>
               )}
@@ -169,7 +244,13 @@ export function BusinessProfileEditor({
           ))}
         </ul>
         {disabled ? null : (
-          <Button type="button" variant="secondary" size="sm" icon="plus" onClick={() => setTopics((r) => [...r, { line: "", id: bump() }])}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            icon="plus"
+            onClick={() => setTopics((r) => [...r, { line: "", id: bump() }])}
+          >
             Aggiungi argomento
           </Button>
         )}

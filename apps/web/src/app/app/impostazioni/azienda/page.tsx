@@ -30,7 +30,7 @@ export default async function BusinessProfilePage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Sedi, orari e servizi usati dall'IA su WhatsApp e nei flussi automatici. Ogni azienda ha il proprio profilo."
       />
-      <SettingsNav current="azienda" />
+      <SettingsNav current="azienda" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}
@@ -43,11 +43,17 @@ export default async function BusinessProfilePage() {
       ) : null}
       <Notice tone="neutral" className="mb-4">
         Completa qui i dati fissi. Per il tono e le regole libere vai all&apos;{" "}
-        <Link href="/app/impostazioni/assistente" className="font-medium text-accent underline-offset-2 hover:underline">
+        <Link
+          href="/app/impostazioni/assistente"
+          className="font-medium text-accent underline-offset-2 hover:underline"
+        >
           Assistente IA
         </Link>{" "}
         e per domande frequenti all&apos;{" "}
-        <Link href="/app/impostazioni/allenamento" className="font-medium text-accent underline-offset-2 hover:underline">
+        <Link
+          href="/app/impostazioni/allenamento"
+          className="font-medium text-accent underline-offset-2 hover:underline"
+        >
           Allenamento IA
         </Link>
         .

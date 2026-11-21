@@ -7,7 +7,9 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./webhooks": "./src/webhooks.ts"
+    "./web": "./src/web.ts",
+    "./webhooks": "./src/webhooks.ts",
+    "./node": "./src/lib/dns-node.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit -p ."

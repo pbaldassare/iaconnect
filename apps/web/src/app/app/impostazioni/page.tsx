@@ -1,4 +1,4 @@
-import { SETTINGS_SECTIONS } from "@/components/settings/settings-nav";
+import { visibleSettingsSections } from "@/components/settings/settings-nav";
 import { Icon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { requireOrg } from "@/lib/session";
@@ -15,12 +15,12 @@ export default async function SettingsPage() {
         title="Impostazioni"
         description={
           org.canManage
-            ? "Utenti, profilo azienda, allenamento IA, modelli di messaggio e trattative."
+            ? "Utenti, ripristino WhatsApp, profilo azienda, allenamento IA, modelli di messaggio e trattative."
             : "Le impostazioni della tua azienda. Le modifiche sono riservate ai titolari."
         }
       />
       <ul className="grid gap-3 sm:grid-cols-2">
-        {SETTINGS_SECTIONS.map((section) => (
+        {visibleSettingsSections(org.canManage).map((section) => (
           <li key={section.key}>
             <Link
               href={section.href}

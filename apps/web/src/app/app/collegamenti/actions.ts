@@ -18,7 +18,7 @@ import { requestJob } from "@/lib/jobs";
 import { isUuid } from "@/lib/org-selection";
 import { type OrgContext, actorOf, requireOrgManager } from "@/lib/session";
 import { MissingServiceKeyError, createServiceClient, hasServiceKey } from "@/lib/supabase/service";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import type { Row } from "@ia-connect/core";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";

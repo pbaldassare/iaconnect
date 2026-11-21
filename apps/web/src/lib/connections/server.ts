@@ -13,8 +13,7 @@ import { publicEnv } from "@/lib/env";
 import type { OrgContext } from "@/lib/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import type { Db } from "@/lib/supabase/types";
-import { nodeHostResolver } from "@ia-connect/connectors";
-import type { ConnectResult, Connector, ConnectorContext, Json, Row } from "@ia-connect/core";
+import type { ConnectResult, Connector, ConnectorContext, HostResolver, Json, Row } from "@ia-connect/core";
 
 /**
  * Server side of the guided connection: runs after `connector.connect` and
@@ -44,6 +43,15 @@ export function connectorEnv(): Record<string, string | undefined> {
 export function oauthStateSecret(): string | null {
   return oauthStateSecretFrom(process.env);
 }
+
+/**
+ * DNS lookup for the address checks. Loaded on first use: the module is Node's
+ * `node:dns`, and a static import would sit on every Collegamenti render.
+ */
+const nodeHostResolver: HostResolver = async (hostname) => {
+  const { nodeHostResolver: resolve } = await import("@ia-connect/connectors/node");
+  return resolve(hostname);
+};
 
 /** What `connector.connect` needs from the web server, DNS lookup for the address checks included. */
 export function connectDeps() {
