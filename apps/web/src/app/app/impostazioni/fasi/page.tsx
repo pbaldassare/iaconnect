@@ -47,7 +47,7 @@ export default async function StagesSettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Le colonne della sezione Trattative, nell'ordine in cui le vedi. Una trattativa che entra in una fase «vinta» o «persa» viene chiusa."
       />
-      <SettingsNav current="fasi" />
+      <SettingsNav current="fasi" canManage={org.canManage} />
       {!org.canManage ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

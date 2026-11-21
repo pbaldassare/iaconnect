@@ -441,6 +441,7 @@ pure con test.
 | `/app/report` | membri | `?periodo=` `questo-mese` (predefinito), `mese-scorso`, `7-giorni`, `30-giorni`, `90-giorni` |
 | `/app/impostazioni` | membri | indice delle sezioni |
 | `/app/impostazioni/utenti`, `/modelli`, `/modelli/nuovo`, `/modelli/[id]`, `/assistente`, `/marchio`, `/fasi`, `/campi`, `/privacy` | tutti leggono, **scrive solo chi gestisce** (`requireOrgManager` nelle azioni) | utenti e inviti, modelli di messaggio, assistente IA, marchio, fasi e campi delle trattative, dati e privacy |
+| `/app/impostazioni/ripristino` | chi gestisce (`requireOrgManager`, 404 altrimenti) | scheda di ripristino WhatsApp, gli stessi fatti di `/app/collegamenti/[id]/ripristino`. Senza un collegamento QR: avviso verso Collegamenti. Con uno: la scheda. Con più di uno: elenco, poi la scheda (`?collegamento=`). La voce non compare a chi non gestisce. Nessun token |
 | `/app/impostazioni/privacy/export` | chi gestisce | scarica il JSON di `export_organization` |
 | `/app/approvazioni` | membri | richieste in attesa (Approva / Rifiuta) e storico |
 | `/app/notifiche` | membri | notifiche, prima quelle da leggere; la campanella del guscio porta qui |
@@ -571,7 +572,7 @@ gestisce l'azienda (`requireOrgManager`). Le regole pure stanno in `lib/connecti
 | `/app/collegamenti` | collegamenti dell'azienda (stato, ultimo controllo, ultimo errore; quelli scaduti o in errore in evidenza con «Ricollega») e catalogo per categoria: disponibile, «Non incluso» (piano o funzione spenta), «In arrivo» (tipo senza codice) |
 | `/app/collegamenti/nuovo/[connector]` | collegamento guidato; `?ricollega=<id>` aggiorna un collegamento esistente |
 | `/app/collegamenti/[id]` | scheda: stato, dati non segreti, indirizzo del webhook, scelta della pagina Facebook, verifica / ricollega / scollega. Per WhatsApp via QR, link «Dati per il ripristino» (solo gestori) |
-| `/app/collegamenti/[id]/ripristino` | scheda di ripristino di un collegamento `whatsapp_wawebapi` (o modalità `qr`): nome, stato, numero della linea, gateway, istanza, link `base/sessionStatus/istanza`, webhook in ingresso e note non segrete. 404 per gli altri connettori e per chi non gestisce l'azienda. Nessun token |
+| `/app/collegamenti/[id]/ripristino` | scheda di ripristino di un collegamento `whatsapp_wawebapi` (o modalità `qr`): nome, stato, numero della linea, gateway, istanza, link `base/sessionStatus/istanza`, webhook in ingresso e note non segrete. Stessi fatti in Impostazioni (`/app/impostazioni/ripristino`). 404 per gli altri connettori e per chi non gestisce l'azienda. Nessun token |
 | `/app/collegamenti/siti`, `/nuova`, `/[id]` | letture da siti e portali: elenco, creazione, versioni del percorso, letture eseguite |
 | `/api/oauth/[connector]/start`, `/callback` | andata e ritorno dell'autorizzazione OAuth |
 | `/app/flussi` | elenco con stato, trigger, ultima esecuzione, esecuzioni e fallite negli ultimi 7 giorni |
@@ -627,7 +628,8 @@ Per modalità:
   `WEBHOOK_PUBLIC_URL`), segreto una volta, esempio `curl` con la firma.
 - `qr`: il collegamento nasce «in errore» con il messaggio di attesa; «Controlla stato»
   chiama `verify` subito dal server web. I gestori hanno anche
-  `/app/collegamenti/[id]/ripristino` (`showsRecoverySheet`, test in
+  `/app/collegamenti/[id]/ripristino` e, per chi gestisce, anche
+  `/app/impostazioni/ripristino` (`showsRecoverySheet`, `recoverySettingsView`, test in
   `apps/web/test/recovery.test.ts`): i fatti pubblici già in `connections.config`
   (numero, `baseUrl`, `instanceId` o `sessionId`, `inboundWebhookUrl`, `lineName`,
   `notes`) e il link di stato costruito come `base/sessionStatus/istanza`.

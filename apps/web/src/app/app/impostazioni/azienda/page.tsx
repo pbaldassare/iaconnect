@@ -30,7 +30,7 @@ export default async function BusinessProfilePage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Sedi, orari e servizi usati dall'IA su WhatsApp e nei flussi automatici. Ogni azienda ha il proprio profilo."
       />
-      <SettingsNav current="azienda" />
+      <SettingsNav current="azienda" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

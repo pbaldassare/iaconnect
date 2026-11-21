@@ -242,3 +242,46 @@ export function recoverySheet(input: {
     extras,
   };
 }
+
+/** A connection row the settings page can place on the restore list. */
+export interface RecoveryCandidate {
+  id: string;
+  connectorType: string;
+  connectMode: string;
+}
+
+/**
+ * What Impostazioni shows for WhatsApp restore.
+ * No qualifying connection → empty, unless an id was asked for (then missing).
+ * One qualifying connection → its sheet.
+ * Several → the list, or one sheet when `selectedId` is one of them.
+ * A selected id that is not a qualifying connection → missing (the page answers 404).
+ */
+export type RecoverySettingsView<T extends RecoveryCandidate> =
+  | { kind: "empty" }
+  | { kind: "list"; connections: T[] }
+  | { kind: "sheet"; connection: T; total: number }
+  | { kind: "missing" };
+
+export function recoverySettingsView<T extends RecoveryCandidate>(
+  rows: readonly T[],
+  selectedId: string | null,
+): RecoverySettingsView<T> {
+  const connections = rows.filter((row) => showsRecoverySheet(row.connectorType, row.connectMode));
+  const selected = selectedId?.trim() ? selectedId.trim() : null;
+
+  if (connections.length === 0) {
+    return selected ? { kind: "missing" } : { kind: "empty" };
+  }
+
+  const only = connections[0];
+  if (connections.length === 1 && only) {
+    if (selected && selected !== only.id) return { kind: "missing" };
+    return { kind: "sheet", connection: only, total: 1 };
+  }
+
+  if (!selected) return { kind: "list", connections };
+  const connection = connections.find((row) => row.id === selected);
+  if (!connection) return { kind: "missing" };
+  return { kind: "sheet", connection, total: connections.length };
+}

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   formatLinePhone,
+  recoverySettingsView,
   recoverySheet,
   sessionStatusUrl,
   showsRecoverySheet,
@@ -132,6 +133,40 @@ describe("WhatsApp recovery sheet", () => {
     expect(showsRecoverySheet("other_qr", "qr")).toBe(true);
     expect(showsRecoverySheet("whatsapp_meta", "api_key")).toBe(false);
     expect(showsRecoverySheet("gmail", "oauth")).toBe(false);
+  });
+
+  it("places qualifying connections on the settings page, and an empty list stays empty", () => {
+    const line = { id: "a", connectorType: "whatsapp_wawebapi", connectMode: "", name: "Linea" };
+    const otherQr = { id: "b", connectorType: "custom_qr", connectMode: "qr", name: "Altra" };
+    const mail = { id: "c", connectorType: "gmail", connectMode: "oauth", name: "Mail" };
+    const meta = { id: "d", connectorType: "whatsapp_meta", connectMode: "api_key", name: "Meta" };
+
+    expect(recoverySettingsView([], null)).toEqual({ kind: "empty" });
+    expect(recoverySettingsView([mail, meta], null)).toEqual({ kind: "empty" });
+    expect(recoverySettingsView([mail, line], null)).toEqual({
+      kind: "sheet",
+      connection: line,
+      total: 1,
+    });
+    expect(recoverySettingsView([line], line.id)).toEqual({
+      kind: "sheet",
+      connection: line,
+      total: 1,
+    });
+
+    expect(recoverySettingsView([mail, line, otherQr], null)).toEqual({
+      kind: "list",
+      connections: [line, otherQr],
+    });
+    expect(recoverySettingsView([line, otherQr], otherQr.id)).toEqual({
+      kind: "sheet",
+      connection: otherQr,
+      total: 2,
+    });
+    expect(recoverySettingsView([], line.id)).toEqual({ kind: "missing" });
+    expect(recoverySettingsView([line], mail.id)).toEqual({ kind: "missing" });
+    expect(recoverySettingsView([line, otherQr], mail.id)).toEqual({ kind: "missing" });
+    expect(recoverySettingsView([mail], mail.id)).toEqual({ kind: "missing" });
   });
 
   it("keeps the page on the manager gate and off the node connector registry", () => {

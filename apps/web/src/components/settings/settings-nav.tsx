@@ -8,6 +8,12 @@ export const SETTINGS_SECTIONS = [
     description: "Chi entra nell'azienda, con quale ruolo.",
   },
   {
+    key: "ripristino",
+    href: "/app/impostazioni/ripristino",
+    label: "Ripristino WhatsApp",
+    description: "Dati pubblici per ripristinare una sessione WhatsApp collegata con il codice QR.",
+  },
+  {
     key: "modelli",
     href: "/app/impostazioni/modelli",
     label: "Modelli di messaggio",
@@ -65,13 +71,23 @@ export const SETTINGS_SECTIONS = [
 
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]["key"];
 
+/** Sections whose page answers 404 unless the viewer can manage the organization. */
+const MANAGER_ONLY_SECTIONS = new Set<SettingsSection>(["ripristino"]);
+
+/** Sections to show. Collaborators do not see entries they cannot open. */
+export function visibleSettingsSections(canManage: boolean) {
+  return canManage
+    ? SETTINGS_SECTIONS
+    : SETTINGS_SECTIONS.filter((section) => !MANAGER_ONLY_SECTIONS.has(section.key));
+}
+
 /** Tabs shared by every settings page. */
-export function SettingsNav({ current }: { current: SettingsSection }) {
+export function SettingsNav({ current, canManage }: { current: SettingsSection; canManage: boolean }) {
   return (
     <Tabs
       label="Sezioni delle impostazioni"
       className="mb-5"
-      items={SETTINGS_SECTIONS.map((section) => ({
+      items={visibleSettingsSections(canManage).map((section) => ({
         href: section.href,
         label: section.label,
         current: section.key === current,
