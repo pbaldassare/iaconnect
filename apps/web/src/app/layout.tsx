@@ -1,25 +1,31 @@
 import { THEME_COOKIE, parseTheme } from "@/lib/theme";
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, Figtree, IBM_Plex_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import "./globals.css";
 
-const display = Bricolage_Grotesque({
-  subsets: ["latin"],
-  weight: ["500", "700", "800"],
+// Google Fonts sometimes returns these families from extension-less URLs.
+// next/font 15 only accepts a file URL that ends in .woff2, so the build
+// keeps the latin subsets in the repository instead of fetching them.
+const display = localFont({
+  src: "../fonts/bricolage-grotesque-latin.woff2",
+  weight: "200 800",
   variable: "--font-bricolage",
   display: "swap",
 });
-const body = Figtree({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const body = localFont({
+  src: "../fonts/figtree-latin.woff2",
+  weight: "300 900",
   variable: "--font-figtree",
   display: "swap",
 });
-const mono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+const mono = localFont({
+  src: [
+    { path: "../fonts/ibm-plex-mono-latin-400.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/ibm-plex-mono-latin-500.woff2", weight: "500", style: "normal" },
+    { path: "../fonts/ibm-plex-mono-latin-600.woff2", weight: "600", style: "normal" },
+  ],
   variable: "--font-plex-mono",
   display: "swap",
 });
