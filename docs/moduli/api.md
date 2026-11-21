@@ -72,7 +72,7 @@ Query, sulle liste di conversazioni e messaggi:
 | `limit` | 50 | intero da 1 a 100 |
 | `before` | assente | istante ISO: solo righe con `created_at` precedente |
 
-L'ordine è dal più recente. La risposta è `{ "data": [ ... ] }`.
+L'ordine delle conversazioni e dei messaggi è `created_at` decrescente (la data di apertura o di registrazione, non `last_message_at`). Le aziende arrivano tutte in una risposta, in ordine di nome: `limit` e `before`, se presenti, sono comunque validati, ma non accorciano quell'elenco. La risposta è `{ "data": [ ... ] }`.
 
 Azienda:
 
@@ -143,4 +143,6 @@ curl -s "https://iaconnect.pages.dev/api/v1/organizations/ORGANIZATION_ID/conver
   -H "Authorization: Bearer iac_…"
 ```
 
-La pagina successiva usa il `created_at` dell'ultima riga ricevuta come `before`.
+La pagina successiva usa il `created_at` dell'ultima riga ricevuta come `before`. Il confronto è stretto. Non c'è `after`, né un totale, né una quota: la versione 1 non risponde 429. Rifare un GET non scrive righe; non c'è un'intestazione `Idempotency-Key`. Una chiave di un'altra azienda riceve 403 prima del controllo di esistenza. Il percorso sconosciuto è 404 prima ancora di leggere la chiave.
+
+Il testo da consegnare ai programmatori è `docs/api/ia-connect-api-v1.pdf` (si rigenera con `python3 scripts/build-api-pdf.py`). Un amministratore della piattaforma lo scarica da `/admin/api`, percorso `/admin/api/documentazione`. Il file non contiene chiavi.

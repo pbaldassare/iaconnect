@@ -79,6 +79,7 @@ describe("canAccessAdminPath", () => {
       "/admin/piani",
       "/admin/rivenditori/x",
       "/admin/monitoraggio",
+      "/admin/api/documentazione",
     ]) {
       expect(canAccessAdminPath(platform, path)).toBe(true);
     }
@@ -95,6 +96,7 @@ describe("canAccessAdminPath", () => {
     expect(canAccessAdminPath(reseller, "/admin/rivenditori")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/monitoraggio")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/api")).toBe(false);
+    expect(canAccessAdminPath(reseller, "/admin/api/documentazione")).toBe(false);
     expect(canAccessAdminPath(reseller, "/admin/qualcosa-di-nuovo")).toBe(false);
   });
 

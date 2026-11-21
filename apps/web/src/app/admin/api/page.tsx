@@ -1,11 +1,14 @@
 import { Badge } from "@/components/ui/badge";
+import { buttonClass } from "@/components/ui/button";
 import { Card, CardHeader } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ActionForm, SubmitButton } from "@/components/ui/form";
 import { Notice } from "@/components/ui/form-message";
+import { Icon } from "@/components/ui/icons";
 import { PageHeader } from "@/components/ui/page-header";
 import { Table, Td, Th } from "@/components/ui/table";
 import { errorMessage } from "@/lib/action";
+import { API_DOC_FILENAME, API_DOC_HREF } from "@/lib/api-doc";
 import { formatDateTime } from "@/lib/format";
 import { requirePlatformAdmin } from "@/lib/session";
 import type { Metadata } from "next";
@@ -46,8 +49,16 @@ export default async function ApiPage() {
           )}
         </Card>
         <Card>
-          <CardHeader title="Come si chiama" />
+          <CardHeader
+            title="Documentazione"
+            description="Il PDF è il contratto da dare ai programmatori: percorsi, chiave, pagine ed errori."
+          />
           <div className="space-y-3 text-sm text-ink/90">
+            <a href={API_DOC_HREF} className={buttonClass("secondary")} download={API_DOC_FILENAME}>
+              <Icon name="download" className="size-4" />
+              Scarica la documentazione (PDF)
+            </a>
+            <p className="text-[13px] text-muted">Il PDF non contiene chiavi.</p>
             <p>
               Indirizzo del sito più il percorso. Al posto del cookie si manda{" "}
               <code className="font-mono text-[13px]">Authorization: Bearer iac_…</code>
