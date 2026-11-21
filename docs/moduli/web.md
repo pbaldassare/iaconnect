@@ -570,7 +570,8 @@ gestisce l'azienda (`requireOrgManager`). Le regole pure stanno in `lib/connecti
 | --- | --- |
 | `/app/collegamenti` | collegamenti dell'azienda (stato, ultimo controllo, ultimo errore; quelli scaduti o in errore in evidenza con «Ricollega») e catalogo per categoria: disponibile, «Non incluso» (piano o funzione spenta), «In arrivo» (tipo senza codice) |
 | `/app/collegamenti/nuovo/[connector]` | collegamento guidato; `?ricollega=<id>` aggiorna un collegamento esistente |
-| `/app/collegamenti/[id]` | scheda: stato, dati non segreti, indirizzo del webhook, scelta della pagina Facebook, verifica / ricollega / scollega |
+| `/app/collegamenti/[id]` | scheda: stato, dati non segreti, indirizzo del webhook, scelta della pagina Facebook, verifica / ricollega / scollega. Per WhatsApp via QR, link «Dati per il ripristino» (solo gestori) |
+| `/app/collegamenti/[id]/ripristino` | scheda di ripristino di un collegamento `whatsapp_wawebapi` (o modalità `qr`): nome, stato, numero della linea, gateway, istanza, link `base/sessionStatus/istanza`, webhook in ingresso e note non segrete. 404 per gli altri connettori e per chi non gestisce l'azienda. Nessun token |
 | `/app/collegamenti/siti`, `/nuova`, `/[id]` | letture da siti e portali: elenco, creazione, versioni del percorso, letture eseguite |
 | `/api/oauth/[connector]/start`, `/callback` | andata e ritorno dell'autorizzazione OAuth |
 | `/app/flussi` | elenco con stato, trigger, ultima esecuzione, esecuzioni e fallite negli ultimi 7 giorni |
@@ -625,7 +626,14 @@ Per modalità:
 - `webhook`: indirizzo `<SUPABASE_URL>/functions/v1/webhook/c/<webhook_token>` (o
   `WEBHOOK_PUBLIC_URL`), segreto una volta, esempio `curl` con la firma.
 - `qr`: il collegamento nasce «in errore» con il messaggio di attesa; «Controlla stato»
-  chiama `verify` subito dal server web.
+  chiama `verify` subito dal server web. I gestori hanno anche
+  `/app/collegamenti/[id]/ripristino` (`showsRecoverySheet`, test in
+  `apps/web/test/recovery.test.ts`): i fatti pubblici già in `connections.config`
+  (numero, `baseUrl`, `instanceId` o `sessionId`, `inboundWebhookUrl`, `lineName`,
+  `notes`) e il link di stato costruito come `base/sessionStatus/istanza`.
+  Chiavi dal nome di credenziale e le chiavi di piattaforma (`cursor`,
+  `pollIntervalMinutes`, `statusCallbackUrl`) non compaiono. La chiave del gateway
+  resta nel Vault.
 - «Verifica ora» chiede il lavoro `verify_connection`; «Scollega» chiama `disconnect`
   (se riesce) e imposta `disconnected`.
 
