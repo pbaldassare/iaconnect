@@ -171,15 +171,13 @@ describe("dashboard aggregations", () => {
     ]);
   });
 
-  it("tracks the first steps of a new customer", () => {
-    expect(onboardingSteps([], []).map((s) => s.done)).toEqual([false, false, false]);
-    const steps = onboardingSteps(connections, [{ status: "draft" }]);
-    expect(steps.map((s) => [s.key, s.done])).toEqual([
-      ["mail", true],
-      ["whatsapp", false],
-      ["flow", false],
-    ]);
-    expect(onboardingSteps(connections, [{ status: "active" }])[2]!.done).toBe(true);
+  it("asks only to connect WhatsApp", () => {
+    expect(onboardingSteps([]).map((s) => [s.key, s.done])).toEqual([["whatsapp", false]]);
+    const steps = onboardingSteps(connections);
+    expect(steps.map((s) => [s.key, s.done])).toEqual([["whatsapp", false]]);
+    expect(onboardingSteps([{ status: "active", category: "whatsapp" }])[0]!.done).toBe(true);
+    expect(onboardingSteps([{ status: "active", category: "mail" }])[0]!.done).toBe(false);
+    expect(onboardingSteps([{ status: "error", category: "whatsapp" }])[0]!.done).toBe(false);
   });
 
   it("sums AI spend by organization and purpose, most expensive first", () => {

@@ -74,7 +74,10 @@ export default async function HomePage() {
   const pipeline = dealsByStage(stages.data ?? [], deals.data ?? []);
   const openDeals = pipeline.reduce((sum, s) => sum + s.count, 0);
   const usage = buildUsage(parsePlanLimits(plan.data?.limits), counters.data ?? [], activeFlows.length);
-  const steps = onboardingSteps(connectionRows, flowRows);
+  const steps = onboardingSteps(connectionRows);
+  const whatsappConnected = connectionRows.some(
+    (row) => row.category === "whatsapp" && row.status === "active",
+  );
   const onboarding = steps.some((s) => !s.done);
   const notificationRows = notifications.data ?? [];
   const hasUnread = notificationRows.some((n) => n.read_at === null);
@@ -96,12 +99,8 @@ export default async function HomePage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {onboarding ? (
           <Card className="lg:col-span-2" aria-labelledby="per-cominciare">
-            <CardHeader
-              id="per-cominciare"
-              title="Per cominciare"
-              description="Tre passi e il primo flusso lavora da solo."
-            />
-            <ol className="grid gap-3 md:grid-cols-3">
+            <CardHeader id="per-cominciare" title="Per cominciare" description="Collega WhatsApp." />
+            <ol className="grid gap-3">
               {steps.map((step, index) => (
                 <li key={step.key} className="flex gap-3 rounded-lg border border-line p-3">
                   <span
@@ -121,7 +120,7 @@ export default async function HomePage() {
                         href={step.href}
                         className="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-accent hover:underline"
                       >
-                        {step.key === "flow" ? "Vai ai flussi" : "Vai ai collegamenti"}
+                        Vai ai collegamenti
                         <Icon name="chevron-right" className="size-3.5" />
                       </Link>
                     )}
@@ -156,10 +155,10 @@ export default async function HomePage() {
               compact
               icon="plug"
               title="Nessun sistema collegato"
-              description="Comincia dalla mail e da WhatsApp: sono i due collegamenti da cui partono quasi tutti i flussi."
+              description="Comincia da WhatsApp: è il collegamento da cui parti."
               action={
                 <ButtonLink href="/app/collegamenti" size="sm">
-                  Collega la mail
+                  Collega WhatsApp
                 </ButtonLink>
               }
             />
@@ -221,20 +220,26 @@ export default async function HomePage() {
             <EmptyState
               compact
               icon="flow"
-              title={flowRows.length === 0 ? "Nessun flusso installato" : "Nessun flusso attivo"}
+              title={flowRows.length === 0 ? "Nessun flusso" : "Nessun flusso attivo"}
               description={
                 flowRows.length === 0
-                  ? "Un flusso è un'automazione: per esempio «arriva una richiesta di preventivo → rispondi su WhatsApp → apri la trattativa». Parti da un modello pronto."
+                  ? whatsappConnected
+                    ? "Non c'è ancora un'automazione attiva."
+                    : "Non c'è ancora un'automazione. Il passo da fare adesso è collegare WhatsApp."
                   : "Hai dei flussi in bozza o in pausa. Provali in simulazione e attivali quando sei pronto."
               }
               action={
-                <ButtonLink
-                  href="/app/flussi"
-                  size="sm"
-                  variant={connectionRows.length === 0 ? "secondary" : "primary"}
-                >
-                  {flowRows.length === 0 ? "Scegli un modello" : "Vai ai flussi"}
-                </ButtonLink>
+                flowRows.length === 0 ? (
+                  whatsappConnected ? undefined : (
+                    <ButtonLink href="/app/collegamenti" size="sm" variant="secondary">
+                      Collega WhatsApp
+                    </ButtonLink>
+                  )
+                ) : (
+                  <ButtonLink href="/app/flussi" size="sm">
+                    Vai ai flussi
+                  </ButtonLink>
+                )
               }
             />
           ) : (

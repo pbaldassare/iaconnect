@@ -1,5 +1,10 @@
 import "server-only";
-import { type CatalogGroup, buildCatalog, categoriesBlockedByFeatures } from "@/lib/connections/catalog";
+import {
+  type CatalogGroup,
+  buildCatalog,
+  categoriesBlockedByFeatures,
+  customerCatalog,
+} from "@/lib/connections/catalog";
 import { isFeatureEnabled } from "@/lib/features";
 import type { OrgContext } from "@/lib/session";
 import { listConnectors } from "@ia-connect/connectors";
@@ -7,8 +12,10 @@ import type { Row } from "@ia-connect/core";
 
 /**
  * What the current organization may connect: enabled connector types, limited
- * by the plan (`allowed_plans`) and by the feature flags. Read with the session
- * client; used by the catalog page and re-checked by every connect action.
+ * by the plan (`allowed_plans`), by the feature flags, and by the connectors
+ * hidden from the customer catalog for now. Read with the session client; used
+ * by the catalog page and re-checked by every connect action. The admin catalog
+ * does not use this.
  */
 export async function loadConnectorCatalog(
   context: Pick<OrgContext, "supabase" | "org">,
@@ -23,7 +30,7 @@ export async function loadConnectorCatalog(
   const implemented = new Set(listConnectors().map((connector) => connector.key));
   const blocked = categoriesBlockedByFeatures((key) => isFeatureEnabled(features.data ?? [], key));
   return {
-    groups: buildCatalog(types.data ?? [], plan.data?.key ?? null, implemented, blocked),
+    groups: customerCatalog(buildCatalog(types.data ?? [], plan.data?.key ?? null, implemented, blocked)),
     types: types.data ?? [],
     error,
   };

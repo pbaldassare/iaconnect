@@ -132,7 +132,7 @@ export default async function ConnectionsPage({
             <EmptyState
               icon="plug"
               title="Nessun collegamento"
-              description="Qui compaiono la mail, WhatsApp, il gestionale e gli altri sistemi collegati. Comincia dalla mail o da WhatsApp: scegli dal catalogo qui sotto."
+              description="Qui compaiono i sistemi collegati. Comincia da WhatsApp: scegli dal catalogo qui sotto."
             />
           ) : (
             <ul className="grid gap-3">

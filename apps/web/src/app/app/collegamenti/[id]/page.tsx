@@ -5,7 +5,13 @@ import { Card, CardHeader } from "@/components/ui/card";
 import { Notice } from "@/components/ui/form-message";
 import { PageHeader } from "@/components/ui/page-header";
 import { canConnect } from "@/lib/connections/access";
-import { availablePages, configSummary, connectModeLabel, webhookExample } from "@/lib/connections/catalog";
+import {
+  availablePages,
+  configSummary,
+  connectModeLabel,
+  isHiddenFromCustomerCatalog,
+  webhookExample,
+} from "@/lib/connections/catalog";
 import { hasOwnWebhook, webhookUrlOf } from "@/lib/connections/server";
 import { formatDateTime, formatRelative } from "@/lib/format";
 import { connectionStatus, connectorCategoryLabel } from "@/lib/labels";
@@ -94,7 +100,9 @@ export default async function ConnectionPage({
             {connection.last_error ?? "I flussi che lo usano sono fermi."}{" "}
             {reconnectHref
               ? "Ricollegalo per farli ripartire."
-              : "Chiedi a chi gestisce l'azienda di ricollegarlo."}
+              : org.canManage && isHiddenFromCustomerCatalog(connection.connector_type)
+                ? "Per adesso questo tipo di collegamento non si rifà da qui."
+                : "Chiedi a chi gestisce l'azienda di ricollegarlo."}
           </Notice>
         ) : null}
 
