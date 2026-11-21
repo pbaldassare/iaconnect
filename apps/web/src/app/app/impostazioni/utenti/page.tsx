@@ -47,7 +47,7 @@ export default async function UsersSettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Titolare: gestisce tutto. Collaboratore: usa inbox, contatti e trattative, senza toccare collegamenti e flussi."
       />
-      <SettingsNav current="utenti" />
+      <SettingsNav current="utenti" canManage={org.canManage} />
       {!org.canManage ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE} Qui vedi solo il tuo accesso.

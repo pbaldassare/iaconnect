@@ -27,7 +27,7 @@ export default async function DealFieldsSettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="I dati in più che vuoi su ogni trattativa, oltre a titolo, valore e prossima azione. Per esempio: tipo di polizza, scadenza, metri quadri."
       />
-      <SettingsNav current="campi" />
+      <SettingsNav current="campi" canManage={org.canManage} />
       {!org.canManage ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

@@ -43,7 +43,7 @@ export default async function AiTrainingPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Insegna all'IA come rispondere su WhatsApp: domande frequenti e risposte verificate, per ogni cliente."
       />
-      <SettingsNav current="allenamento" />
+      <SettingsNav current="allenamento" canManage={org.canManage} />
       {disabled ? (
         <Notice tone="neutral" className="mb-4">
           {READ_ONLY_NOTE}

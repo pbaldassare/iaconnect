@@ -18,7 +18,7 @@ export default async function PrivacySettingsPage() {
         back={{ href: "/app/impostazioni", label: "Impostazioni" }}
         description="Chi è responsabile dei dati e come ottenerne una copia."
       />
-      <SettingsNav current="privacy" />
+      <SettingsNav current="privacy" canManage={org.canManage} />
       <div className="grid max-w-3xl gap-4">
         <Card aria-labelledby="ruoli">
           <CardHeader id="ruoli" title="Chi fa cosa" />
