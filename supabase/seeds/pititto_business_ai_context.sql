@@ -1,5 +1,6 @@
 -- Pititto Assicurazioni: profilo azienda e allenamento IA (org pilota).
 -- organization_id 7642fb92-b179-482a-ae75-c1e3c01dcc5e
+-- Orari e sede: assicurazionipititto.it/contatti, 21 novembre 2026. Una sola sede pubblicata.
 
 update ia_connect.org_settings
 set
@@ -8,18 +9,18 @@ set
     'Siamo Pititto Assicurazioni. Non comunicare premi o coperture non presenti in polizza o preventivo. Per sinistri, disdette e contestazioni passa subito la conversazione a un collega. I messaggi su scadenze e rinnovi possono richiamare i dati del gestionale Assicurapp quando disponibili.',
   business_profile = $$
 {
-  "summary": "Pititto Assicurazioni è un'agenzia assicurativa che segue famiglie e imprese del territorio su auto, casa, RC professionale e polizze vita/infortuni. Usiamo Assicurapp per scadenze e rinnovi.",
+  "summary": "Pititto Assicurazioni, broker e agenzia a Colleferro, segue famiglie, professionisti e imprese su vita, RCA, casa e RC professionale. La sede pubblicata è in Via Enrico Ferri 21. Per scadenze e rinnovi usiamo Assicurapp.",
   "openingHours": [
-    { "label": "Lun–Ven", "hours": "9:00–13:00, 15:00–18:30" },
-    { "label": "Sabato", "hours": "9:30–12:30 su appuntamento" }
+    { "label": "Lunedì–venerdì", "hours": "09:00–13:00 e 14:30–18:00" },
+    { "label": "Sabato e domenica", "hours": "Non indicati sul sito: non risultano aperti" }
   ],
   "locations": [
     {
-      "name": "Agenzia Pititto",
-      "address": "Contattare l'agenzia per l'indirizzo aggiornato della sede",
-      "phone": "+39",
-      "hours": "Lun–Ven 9–13 e 15–18:30",
-      "notes": "Parcheggio in zona. Per appuntamenti fuori orario scrivere qui in chat."
+      "name": "Assicurazioni Pititto",
+      "address": "Via Enrico Ferri 21, 00034 Colleferro (Roma)",
+      "phone": "06 4566 2300",
+      "hours": "Lun–ven 09:00–13:00 e 14:30–18:00",
+      "notes": "WhatsApp +39 334 238 1938. Email assicurazionipititto@gmail.com. Il sito pubblica solo questa sede: non indicare altri indirizzi."
     }
   ],
   "services": [
@@ -45,7 +46,14 @@ $$::jsonb,
       "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "topic": "Orari",
       "question": "A che ora siete aperti?",
-      "answer": "Siamo aperti dal lunedì al venerdì 9–13 e 15–18:30. Il sabato 9:30–12:30 solo su appuntamento.",
+      "answer": "Siamo aperti dal lunedì al venerdì, dalle 09:00 alle 13:00 e dalle 14:30 alle 18:00. Sabato e domenica il sito non indica apertura.",
+      "active": true
+    },
+    {
+      "id": "e5f6a7b8-c9d0-4123-8abc-345678901234",
+      "topic": "Sede",
+      "question": "Dove siete? Qual è l'indirizzo?",
+      "answer": "La sede è in Via Enrico Ferri 21, 00034 Colleferro (Roma). Telefono 06 4566 2300, WhatsApp +39 334 238 1938. È l'unico indirizzo pubblicato sul sito.",
       "active": true
     },
     {
