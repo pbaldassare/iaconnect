@@ -92,10 +92,14 @@ apps/web
 | `/admin/aziende`, `/nuova`, `/[id]` | admin piattaforma e rivenditore | elenco, creazione, scheda |
 | `/admin/aziende/[id]/export` | come sopra | scarica il JSON di `export_organization` |
 | `/admin/registro` | come sopra | registro con filtri |
+| `/admin/api` | solo admin piattaforma | chiavi dell'API di lettura (`docs/moduli/api.md`) |
+| `/api/v1/…` | chiave Bearer | aziende, conversazioni e messaggi visibili a quella chiave; niente cookie |
 | `/admin/richieste`, `/catalogo`, `/piani`, `/rivenditori`, `/monitoraggio` | solo admin piattaforma | |
 
 La scheda azienda usa `?scheda=` per le sezioni: `dati`, `utenti`, `collegamenti`, `flussi`,
-`consumi`, `funzioni`, `personalizzazioni`, `assistenza`.
+`consumi`, `funzioni`, `personalizzazioni`, `assistenza`, `conversazioni`.
+`conversazioni` è lo storico dell'azienda, le stesse righe dell'Inbox.
+`?conversazione=` apre un filo.
 
 ## Sessione, azienda corrente, assistenza
 
@@ -434,6 +438,9 @@ pure con test.
 | --- | --- | --- |
 | `/app/inbox` | membri | elenco delle conversazioni: viste (tutte, da gestire, automatiche, non lette, chiuse), canale, ricerca per nome / telefono / mail |
 | `/app/inbox/[id]` | membri | la conversazione: messaggi, stato di consegna, scheda del contatto, azioni e campo di scrittura. Su schermo stretto è una pagina a sé, su schermo largo sta accanto all'elenco |
+
+L'admin legge lo stesso storico dalla scheda azienda (`?scheda=conversazioni`),
+un'altra piattaforma da `GET /api/v1` (`docs/moduli/api.md`).
 | `/app/contatti`, `/nuovo`, `/[id]`, `/[id]/modifica` | membri | elenco con ricerca e pagine, creazione, scheda (dati, consensi, memoria, storia, trattative, conversazioni), modifica |
 | `/app/contatti/[id]/export` | membri | scarica il JSON di `export_contact` (registrato come `contact.export`) |
 | `/app/trattative` | membri | colonne per fase con totali; `?vista=elenco` per l'elenco con filtri (stato, fase, assegnatario); `&scadenze=1` la vista «Scadenze», solo se l'azienda ha il campo `scadenza` tra i campi delle trattative |

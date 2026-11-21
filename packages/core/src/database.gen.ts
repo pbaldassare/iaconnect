@@ -102,6 +102,45 @@ export interface Database {
         };
         Relationships: [];
       };
+      api_keys: {
+        Row: {
+          id: string;
+          organization_id: string | null;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          created_by: string | null;
+          last_used_at: string | null;
+          revoked_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id?: string | null;
+          name: string;
+          key_prefix: string;
+          key_hash: string;
+          created_by?: string | null;
+          last_used_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string | null;
+          name?: string;
+          key_prefix?: string;
+          key_hash?: string;
+          created_by?: string | null;
+          last_used_at?: string | null;
+          revoked_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       appointments: {
         Row: {
           id: string;
@@ -1106,10 +1145,10 @@ export interface Database {
           ai_disclosure: string;
           brand: Json;
           deal_custom_fields: Json;
-          business_profile: Json;
-          ai_training: Json;
           created_at: string;
           updated_at: string;
+          business_profile: Json;
+          ai_training: Json;
         };
         Insert: {
           id?: string;
@@ -1121,10 +1160,10 @@ export interface Database {
           ai_disclosure?: string;
           brand?: Json;
           deal_custom_fields?: Json;
-          business_profile?: Json;
-          ai_training?: Json;
           created_at?: string;
           updated_at?: string;
+          business_profile?: Json;
+          ai_training?: Json;
         };
         Update: {
           id?: string;
@@ -1136,10 +1175,10 @@ export interface Database {
           ai_disclosure?: string;
           brand?: Json;
           deal_custom_fields?: Json;
-          business_profile?: Json;
-          ai_training?: Json;
           created_at?: string;
           updated_at?: string;
+          business_profile?: Json;
+          ai_training?: Json;
         };
         Relationships: [];
       };
@@ -1620,6 +1659,46 @@ export interface Database {
       is_platform_admin: { Args: Record<string, never>; Returns: boolean };
       can_manage_org: { Args: { p_org: string }; Returns: boolean };
       has_org_access: { Args: { p_org: string }; Returns: boolean };
+      issue_api_key: {
+        Args: { p_name: string; p_organization: string | null; p_prefix: string; p_hash: string };
+        Returns: string;
+      };
+      revoke_api_key: { Args: { p_key: string }; Returns: undefined };
+      api_organizations: {
+        Args: { p_hash: string };
+        Returns: { id: string; name: string; sector: string; status: string; created_at: string }[];
+      };
+      api_conversations: {
+        Args: { p_hash: string; p_organization: string; p_limit: number; p_before?: string | null };
+        Returns: {
+          id: string;
+          contact_id: string;
+          contact_name: string;
+          channel: string;
+          status: string;
+          last_message_at: string | null;
+          unread_count: number;
+          created_at: string;
+        }[];
+      };
+      api_messages: {
+        Args: {
+          p_hash: string;
+          p_organization: string;
+          p_conversation: string;
+          p_limit: number;
+          p_before?: string | null;
+        };
+        Returns: {
+          id: string;
+          direction: string;
+          channel: string;
+          content: string;
+          delivery_status: string;
+          external_id: string | null;
+          created_at: string;
+        }[];
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

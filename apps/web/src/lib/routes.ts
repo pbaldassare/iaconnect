@@ -39,8 +39,14 @@ const PRESENTATION_ASSETS = "/assets/";
  * Everything except the presentation site and the sign-in, sign-up, password reset, privacy
  * and auth callback pages needs a session.
  */
+/** Bearer API. The route checks the key; the session cookie is not required. */
+export function isPlatformApiPath(pathname: string): boolean {
+  return pathname === "/api/v1" || pathname.startsWith("/api/v1/");
+}
+
 export function isProtectedPath(pathname: string): boolean {
   if (PRESENTATION_PATHS.includes(pathname) || pathname.startsWith(PRESENTATION_ASSETS)) return false;
+  if (isPlatformApiPath(pathname)) return false;
   return !PUBLIC_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
