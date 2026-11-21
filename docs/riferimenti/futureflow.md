@@ -1,94 +1,74 @@
-# Futureflow — documentazione waWebApi
+# Futureflow — waWebApi 1.0
 
-Appunti presi il 2026-10-04 dalla documentazione pubblica di waWebApi (versione 1.0):
+Riletto il 2026-11-20 dalla specifica pubblica (OpenAPI 1.0, id `bkaibnti9tysr`):
 https://infinity-digital.stoplight.io/docs/wawebapi/bkaibnti9tysr-wa-web-api
 
-Descrizione nella fonte: "Api per l'invio di messaggi tramite waWebApi".
-Serve come riferimento per riallineare il connettore `whatsapp_wawebapi`
-(`packages/connectors/src/whatsapp-wawebapi.ts`), che oggi usa indirizzi e campi ipotizzati.
-
-## Indirizzi
-
-| Ambiente | Indirizzo |
-| --- | --- |
-| Server reale (come scritto nella documentazione) | `http://localhost:3000` |
-| Server di prova (Stoplight) | `https://stoplight.io/mocks/infinity-digital/wawebapi/14362840` |
-
-L'indirizzo reale dell'installazione va chiesto al fornitore: la documentazione riporta solo `localhost`.
+Il connettore `whatsapp_wawebapi` segue questo contratto. Il server in uso per
+Ass.ni Pititto è `https://whatsapp.futureflow.it` (la specifica scrive solo
+`http://localhost:3000`).
 
 ## Autenticazione
 
-Token nell'intestazione di ogni richiesta: `Authorization: Bearer <token>`.
+`Authorization: Bearer <token>` su ogni chiamata di invio. Un corpo senza token
+è accettato: il token nel JSON non è richiesto. Senza Bearer la risposta è `401`.
 
-## Campi comuni a tutte le chiamate
+## Invio
 
-| Campo | Tipo | Obbligatorio | Significato |
-| --- | --- | --- | --- |
-| `instanceId` | stringa | sì | Istanza da cui parte il messaggio |
-| `recipient` | stringa | sì | Numero del destinatario con prefisso internazionale, senza `+` (es. `393400000000`) |
+`POST /api/message/text` con `Content-Type: application/json`.
 
-Tutte le chiamate sono `POST` con corpo `application/json`.
-
-## Chiamate
-
-| Cosa invia | Percorso | Campi oltre a quelli comuni |
+| Campo | Obbligatorio | Significato |
 | --- | --- | --- |
-| Messaggio di testo | `/api/message/text/{paramsPath}` | `message` (obbligatorio) |
-| Immagine | `/api/message/image` | `imageUrl` (obbligatorio, indirizzo completo), `caption` |
-| Video | `/api/message/video` | `videoUrl` (obbligatorio, indirizzo completo), `caption` |
-| Audio | `/api/message/audio` | `audioUrl` (obbligatorio, indirizzo completo), `caption` |
-| Documento | `/api/message/document` | `documentUrl` (obbligatorio, indirizzo completo), `caption` |
-| Contatto | `/api/message/contact` | `fullName` (obbligatorio), `phoneNumber` (obbligatorio), `organization` |
+| `instanceId` | sì | Istanza da cui parte il messaggio |
+| `recipient` | sì | Numero con prefisso internazionale, senza `+` |
+| `message` | sì | Testo |
 
-`{paramsPath}` nella chiamata di testo è descritto come "Path of params on request json (keys
-separated by dot)": il suo uso non è spiegato oltre e va chiarito con il fornitore.
+La specifica scrive il percorso come `/api/message/text/{paramsPath}` e non spiega
+`paramsPath`. Sul server Futureflow la route che esiste è `/api/message/text`,
+senza quel segmento. Il connettore usa questa.
 
-Esempio (testo):
-
-```bash
-curl --request POST \
-  --url <indirizzo>/api/message/text/{paramsPath} \
-  --header 'Authorization: Bearer <token>' \
-  --header 'Content-Type: application/json' \
-  --data '{ "instanceId": "…", "recipient": "393400000000", "message": "…" }'
-```
-
-## Risposta
-
-Codici dichiarati per ogni chiamata: `200`, `401`, `404`, `422`, `500`, `503`.
-Con `200` ("Messaggio disposto per l'invio"):
+Risposta `200`:
 
 ```json
 {
   "success": true,
   "data": {
     "key": { "remoteJid": "393400000000@s.whatsapp.net", "fromMe": true, "id": "BAE54E95D9C9B31F" },
-    "message": { "extendedTextMessage": { "text": "…" } },
-    "messageTimestamp": "1669410173",
     "status": "PENDING"
   }
 }
 ```
 
-- `data.key.id` è l'identificativo del messaggio.
-- `data.message` cambia forma secondo il tipo: `extendedTextMessage`, `imageMessage`,
-  `videoMessage`, `audioMessage`, `documentMessage`, `contactMessage`.
-- `status` nell'esempio è sempre `PENDING`.
+L'identificativo del messaggio è `data.key.id`.
 
-## Cosa la documentazione non copre
+Stessi campi comuni per immagine, video, audio, documento e contatto
+(`/api/message/image`, `/video`, `/audio`, `/document`, `/contact`), con
+`imageUrl`, `videoUrl`, `audioUrl`, `documentUrl` oppure `fullName` e
+`phoneNumber`. Il connettore oggi invia solo testo: i modelli del motore
+diventano `message`.
 
-- **Ricezione**: nessuna chiamata o webhook per i messaggi in arrivo.
-- **Stati di consegna**: nessun modo documentato per sapere se un messaggio è stato consegnato o letto.
-- **Collegamento del numero**: nessuna chiamata per creare un'istanza o ottenere il codice QR.
-- **Modelli**: non esistono modelli lato fornitore; si invia solo testo libero o file.
-- **Limiti di invio** e significato dei codici d'errore.
+Codici: `401` token non valido, `404` istanza assente, `422` campi mancanti,
+`503` dispositivo non connesso (ritentabile).
 
-Senza ricezione e stati di consegna il connettore può solo inviare: attese di risposta,
-`ai.reply` e inbox non funzionano su questo canale finché il fornitore non offre anche quelli.
+## Webhook in ingresso
 
-## Differenze con il connettore attuale
+La specifica descrive il corpo, non una chiamata per registrare l'indirizzo.
+L'indirizzo del collegamento (`…/webhook/c/<token>`) va incollato nel pannello
+Futureflow. Non c'è firma: l'autenticazione è il token nel percorso.
 
-Il connettore `whatsapp_wawebapi` è stato scritto prima di avere questa documentazione. Da riallineare:
-percorsi delle chiamate, nomi dei campi (`instanceId`, `recipient`, `message`), formato del numero
-(senza `+`), lettura dell'identificativo da `data.key.id`. Le parti su codice QR, stato della
-sessione e webhook in ingresso non hanno riscontro in questa documentazione.
+| `type` | `body` | Effetto nel connettore |
+| --- | --- | --- |
+| `message` (o tipo omesso, `body` oggetto) | `key`, `message`, `pushName`, `messageTimestamp` | `whatsapp.message.received` se `fromMe` non è vero |
+| `message_update` | array di `{ key, update: { status } }` | `whatsapp.status.updated` |
+| `connection` | `{ connection: "open" \| "close" \| "connecting" }` | stato del collegamento, nessun evento di flusso |
+
+Mittente: cifre di `key.remoteJid` prima di `@`. Un jid che finisce in `@lid`
+non è un numero e il messaggio non diventa un contatto.
+
+Testo: `message.conversation`, oppure `extendedTextMessage.text`, oppure la
+didascalia di immagine, video o documento.
+
+Stati di `update.status`: `0` errore, `2` inviato, `3` consegnato, `4` letto,
+`5` letto (nota vocale riprodotta). `1` (in attesa) non genera un evento.
+
+I file arrivano cifrati (`url` + `mediaKey`). Il payload tiene `mediaUrl` e non
+scarica il file.

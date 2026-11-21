@@ -605,10 +605,10 @@ chiama i connettori»: serve una risposta immediata e i segreti non devono passa
    dal nome di credenziale e valori uguali a un segreto;
 3. `store_connection_secret` con il client di servizio; se fallisce la riga viene tolta
    (`remove_connection`);
-4. se il connettore ha l'azione `registerWebhook` (Stripe, waWebApi) viene chiamata con
+4. se il connettore ha l'azione `registerWebhook` (Stripe) viene chiamata con
    l'indirizzo del collegamento; se fallisce il collegamento resta e la scheda offre
    «Registra di nuovo il webhook». Per Twilio l'indirizzo viene scritto in
-   `config.statusCallbackUrl`.
+   `config.statusCallbackUrl`. Per waWebApi l'indirizzo si copia a mano nel pannello.
 
 **I clienti non scrivono `connections`.** `external_account_id`, `config` e
 `webhook_token` decidono a quale azienda arriva un webhook: con il client di sessione si

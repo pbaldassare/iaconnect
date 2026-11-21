@@ -23,7 +23,8 @@ const HELP: Record<string, string[]> = {
     "Servono tre dati dal pannello Meta for Developers, prodotto WhatsApp: Phone number ID, WABA ID e un token permanente di un utente di sistema.",
   ],
   whatsapp_wawebapi: [
-    "Serve la chiave del gateway waWebApi. Dopo il collegamento compare un codice QR da inquadrare con WhatsApp, da Dispositivi collegati.",
+    "Il numero si associa prima sul pannello waWebApi (codice QR). Qui servono l'id istanza e il token Bearer.",
+    "Dopo il collegamento copia l'indirizzo webhook nel pannello: è l'unico modo per ricevere i messaggi.",
     "È una modalità sperimentale: per l'uso stabile scegli WhatsApp Business (Meta).",
   ],
   crm_rest: [

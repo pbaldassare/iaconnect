@@ -37,11 +37,14 @@ describe("WhatsApp via QR (waWebApi)", () => {
       config: { env: { ...ENV, WAWEBAPI_BASE_URL: "https://wa-gateway.example.com" } },
     });
     const wa = await t.connect("whatsapp_wawebapi", {
-      config: { sessionId: "ia-session-1" },
-      secrets: { apiKey: "wawebapi-key-123", webhookSecret: "wawebapi-webhook-secret" },
+      config: { instanceId: "ia-session-1", baseUrl: "https://wa-gateway.example.com" },
+      secrets: { apiKey: "wawebapi-key-123" },
       externalAccountId: "ia-session-1",
     });
-    t.net.on("POST", "https://wa-gateway.example.com/sessions/ia-session-1/messages", { id: "wa-out-1" });
+    t.net.on("POST", "https://wa-gateway.example.com/api/message/text", {
+      success: true,
+      data: { key: { id: "wa-out-1", fromMe: true, remoteJid: "393331234567@s.whatsapp.net" } },
+    });
     await t.addTemplate({ name: "grazie", body: "Grazie {{1}}, la ricontattiamo per {{2}}." });
     await t.addFlow({
       trigger: { event: "whatsapp.message.received", filters: [] },
@@ -53,22 +56,25 @@ describe("WhatsApp via QR (waWebApi)", () => {
         },
       ],
     });
-    const secret = { "x-webhook-secret": "wawebapi-webhook-secret" };
     const response = await t.webhook(
-      post(wa.webhookToken, secret, {
-        event: "message",
-        data: {
-          id: "wa-in-1",
-          from: "393331234567",
-          fromName: "Mario Rossi",
-          text: "Buongiorno",
-          timestamp: Math.floor(t.now().getTime() / 1000),
+      post(
+        wa.webhookToken,
+        {},
+        {
+          type: "message",
+          body: {
+            key: { remoteJid: "393331234567@s.whatsapp.net", fromMe: false, id: "wa-in-1" },
+            pushName: "Mario Rossi",
+            messageTimestamp: Math.floor(t.now().getTime() / 1000),
+            message: { conversation: "Buongiorno" },
+          },
         },
-      }),
+      ),
     );
     expect(response.status).toBe(200);
     expect(
-      (await t.webhook(post(wa.webhookToken, { "x-webhook-secret": "wrong" }, { event: "message" }))).status,
+      (await t.webhook(new Request(`${ENV.WEBHOOK_PUBLIC_URL}/c/${wa.webhookToken}`, { method: "GET" })))
+        .status,
     ).toBe(401);
     await drain(t.deps);
 
@@ -84,21 +90,34 @@ describe("WhatsApp via QR (waWebApi)", () => {
     expect(inbound.window_expires_at).toBeTruthy();
     // No provider-side templates here: the connector sends the text the engine rendered,
     // with the variables in numeric order whatever the order of the keys.
-    const [call] = t.net.to("https://wa-gateway.example.com/sessions/ia-session-1/messages");
-    expect(call!.headers["x-api-key"]).toBe("wawebapi-key-123");
+    const [call] = t.net.to("https://wa-gateway.example.com/api/message/text");
+    expect(call!.headers.authorization).toBe("Bearer wawebapi-key-123");
     expect(call!.json).toEqual({
-      to: "393331234567",
-      text: "Grazie Mario Rossi, la ricontattiamo per il preventivo.",
+      instanceId: "ia-session-1",
+      recipient: "393331234567",
+      message: "Grazie Mario Rossi, la ricontattiamo per il preventivo.",
     });
 
     await t.webhook(
-      post(wa.webhookToken, secret, { event: "status", data: { id: "wa-out-1", status: "delivered" } }),
+      post(
+        wa.webhookToken,
+        {},
+        {
+          type: "message_update",
+          body: [
+            {
+              key: { id: "wa-out-1", fromMe: true, remoteJid: "393331234567@s.whatsapp.net" },
+              update: { status: 3 },
+            },
+          ],
+        },
+      ),
     );
     await drain(t.deps);
     expect(
       await t.one("select delivery_status from ia_connect.messages where external_id = 'wa-out-1'"),
     ).toEqual({ delivery_status: "delivered" });
-    expect(await leaks(t, ["wawebapi-key-123", "wawebapi-webhook-secret"])).toEqual([]);
+    expect(await leaks(t, ["wawebapi-key-123"])).toEqual([]);
   });
 });
 

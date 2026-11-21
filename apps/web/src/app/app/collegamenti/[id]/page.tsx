@@ -34,7 +34,8 @@ const WEBHOOK_HINTS: Record<string, string> = {
     "Va inserito nell'azione «Webhook» di un workflow GoHighLevel, insieme al segreto mostrato alla creazione.",
   sms_twilio: "Va impostato sul numero Twilio, alla voce «A message comes in» (metodo POST).",
   payment_stripe: "Lo registriamo noi su Stripe. Se non risulta registrato, usa il pulsante qui sopra.",
-  whatsapp_wawebapi: "Lo registriamo noi sul gateway. Se i messaggi non arrivano, registralo di nuovo.",
+  whatsapp_wawebapi:
+    "Copialo nel pannello Futureflow dell'istanza, come indirizzo dei messaggi in arrivo. Da qui non si può registrare.",
 };
 
 export default async function ConnectionPage({

@@ -125,16 +125,21 @@ Per ognuno: cosa deve fornire il cliente, cosa emette, cosa offre.
 
 ### `whatsapp_wawebapi` — WhatsApp via QR (whatsapp, QR) — sperimentale
 
-- **Il cliente fornisce:** la chiave API del gateway; poi inquadra il QR.
+- **Il cliente fornisce:** l'id istanza e il token Bearer di un numero già associato
+  sul pannello waWebApi. Facoltativo l'indirizzo del server (altrimenti
+  `WAWEBAPI_BASE_URL`); viene controllato come ogni indirizzo scritto dal cliente
+  e salvato nel collegamento.
 - **Emette:** `whatsapp.message.received`, `whatsapp.status.updated`.
-- **Offre:** `sendText`, `sendTemplate` (invia `renderedText`: non esistono modelli lato
-  fornitore), più `registerWebhook` (non standard).
-- **Webhook:** `…/webhook/c/<webhook_token>` con intestazione `x-webhook-secret`.
-  Dopo aver creato il collegamento la piattaforma deve chiamare l'azione
-  `registerWebhook` con questo indirizzo.
-- **L'API del prodotto reale non è stata verificata.** La mappatura HTTP è una nostra
-  ipotesi, tutta nell'oggetto `WAWEBAPI` di `whatsapp-wawebapi.ts`. Va confrontata con
-  la documentazione di waWebApi prima di qualunque uso.
+- **Offre:** `sendText`, `sendTemplate` (invia `renderedText`: non esistono modelli
+  lato fornitore). Chiamata: `POST /api/message/text` con Bearer,
+  `{ instanceId, recipient, message }`. L'id è `data.key.id`. `503` significa
+  telefono non connesso.
+- **Webhook:** `…/webhook/c/<webhook_token>`, da incollare nel pannello Futureflow.
+  Nessuna firma. Corpi: `message`, `message_update`, `connection`
+  (vedi `docs/riferimenti/futureflow.md`). `connection: close` segna il
+  collegamento come scaduto al controllo successivo.
+- Lo scollegamento da IA Connect non disconnette il telefono: la specifica non
+  ha una chiamata di logout.
 
 ### `crm_rest` — Gestionale (crm, chiave)
 
@@ -304,8 +309,9 @@ Da valutare in `packages/core` (non modificato):
    nell'intestazione interna `x-ia-request-url` (sovrascritta sempre, non falsificabile
    dal chiamante).
 2. `connect` non conosce l'indirizzo del webhook del collegamento (il token nasce nel
-   database dopo). Stripe e waWebApi espongono per questo un'azione `registerWebhook`
-   da chiamare dopo la creazione; Twilio legge `config.statusCallbackUrl`.
+   database dopo). Stripe espone per questo un'azione `registerWebhook` da chiamare
+   dopo la creazione; Twilio legge `config.statusCallbackUrl`. waWebApi non ha una
+   chiamata di registrazione: l'indirizzo si copia nel pannello.
 3. I segreti generati al collegamento (`webhook_inbound`, `signature_link`,
    `ghl_social`) non hanno un canale per essere mostrati al cliente: va fatto da chi
    chiama `connect`, una sola volta.
@@ -337,7 +343,10 @@ Tutto. In dettaglio:
   richiesta reale.
 - **Stripe:** `price_data` sui Payment Link e la propagazione dei metadati alla sessione
   di pagamento vanno confermati in modalità di prova.
-- **waWebApi e GoHighLevel:** mappature ipotetiche, vedi sopra.
+- **waWebApi:** invio e forma dei webhook seguono la specifica 1.0 e la route
+  viva `POST /api/message/text` su Futureflow. Un invio vero e un messaggio in
+  arrivo sul numero di un cliente restano da fare a mano.
+- **GoHighLevel:** mappatura ipotetica, vedi sopra.
 - **Firma:** segnaposto.
 
 ## Test
