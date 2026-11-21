@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { CONNECTOR_CATEGORIES, STANDARD_ACTIONS, isKnownEventType } from "@ia-connect/core";
 import { describe, expect, it } from "vitest";
 import { getConnector, listConnectors, webhookConnectors } from "../src/index.ts";
+import { getConnector as getWebConnector, listConnectors as listWebConnectors } from "../src/web.ts";
 
 const root = join(import.meta.dirname, "..", "..", "..");
 const srcDir = join(import.meta.dirname, "..", "src");
@@ -156,6 +157,33 @@ describe("Deno compatibility of the sources", () => {
       expect(file).not.toMatch(/imap-smtp\.ts$/);
       expect(source, file).not.toMatch(/from\s+"(node:[^"]+|imapflow|nodemailer|mailparser)"/);
       expect(source, file).not.toMatch(/\bBuffer\b|\bprocess\./);
+    }
+  });
+
+  it("keeps the Node IMAP stack out of the web entry the Pages app loads", () => {
+    const files = reachable(join(srcDir, "web.ts"));
+    expect(files.size).toBeGreaterThan(10);
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      expect(file).not.toMatch(/imap-smtp\.ts$/);
+      expect(file).not.toMatch(/dns-node\.ts$/);
+      expect(source, file).not.toMatch(/from\s+"(node:[^"]+|imapflow|nodemailer|mailparser)"/);
+    }
+    const webKeys = listWebConnectors()
+      .map((connector) => connector.key)
+      .sort();
+    expect(webKeys).toEqual(
+      listConnectors()
+        .map((connector) => connector.key)
+        .sort(),
+    );
+    for (const key of ["whatsapp_wawebapi", "crm_rest", "imap_smtp"]) {
+      const web = getWebConnector(key);
+      const node = getConnector(key);
+      expect(web, key).toBeDefined();
+      expect(web!.name, key).toBe(node!.name);
+      expect(web!.connectMode, key).toBe(node!.connectMode);
+      expect(web!.category, key).toBe(node!.category);
     }
   });
 });

@@ -11,7 +11,7 @@ import { isUuid } from "@/lib/org-selection";
 import { firstParam } from "@/lib/pagination";
 import { requireOrgManager } from "@/lib/session";
 import { MissingServiceKeyError, hasServiceKey } from "@/lib/supabase/service";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";

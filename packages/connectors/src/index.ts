@@ -1,3 +1,7 @@
+/**
+ * Node registry (worker, tests). The web app imports `./web.ts` instead: this
+ * file loads the IMAP/SMTP connector and its Node-only libraries up front.
+ */
 import type { Connector } from "@ia-connect/core";
 import { imapSmtpConnector } from "./imap-smtp.ts";
 import { webConnectors } from "./registry.ts";

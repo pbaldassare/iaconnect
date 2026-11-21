@@ -11,7 +11,7 @@ import { DEMO_READ_ONLY_MESSAGE } from "@/lib/demo/client";
 import { requireOrgManager } from "@/lib/session";
 import { hasServiceKey } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/url";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import { revalidatePath } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 

@@ -1,6 +1,7 @@
 /**
  * Node-only connector (imapflow, mailparser, nodemailer): reachable from `index.ts`
- * only, never from `webhooks.ts` (edge runtime).
+ * and, lazily, from `web.ts` when an IMAP method actually runs. Never from
+ * `webhooks.ts` (edge runtime), and never as a static import of the web app.
  */
 import {
   type Connector,
@@ -16,7 +17,7 @@ import {
 import { ImapFlow } from "imapflow";
 import { simpleParser } from "mailparser";
 import nodemailer from "nodemailer";
-import { z } from "zod";
+import { IMAP_SMTP_DESCRIPTION, IMAP_SMTP_NAME, ImapSmtpInput } from "./imap-smtp-schema.ts";
 import { defineAction } from "./lib/actions.ts";
 import { nodeHostResolver } from "./lib/dns-node.ts";
 import { AUTH_EXPIRED, HEALTHY, healthFromError, parseInput, requireString } from "./lib/http.ts";
@@ -26,18 +27,7 @@ import { asString, compact } from "./lib/values.ts";
 const SERVICE = "Casella IMAP/SMTP";
 const MAX_MESSAGES_PER_POLL = 50;
 
-export const ImapSmtpInput = z.object({
-  email: z.string().email().describe("Indirizzo mail della casella"),
-  fromName: z.string().optional().describe("Nome mostrato come mittente"),
-  username: z.string().min(1).describe("Nome utente (di solito l'indirizzo mail)"),
-  password: z.string().min(1).describe("Password o password per le app"),
-  imapHost: z.string().min(1).describe("Server IMAP (posta in arrivo)"),
-  imapPort: z.number().int().positive().default(993).describe("Porta IMAP"),
-  imapSecure: z.boolean().default(true).describe("Connessione IMAP cifrata (TLS)"),
-  smtpHost: z.string().min(1).describe("Server SMTP (posta in uscita)"),
-  smtpPort: z.number().int().positive().default(465).describe("Porta SMTP"),
-  smtpSecure: z.boolean().default(true).describe("Connessione SMTP cifrata (TLS)"),
-});
+export { IMAP_SMTP_DESCRIPTION, IMAP_SMTP_NAME, ImapSmtpInput };
 
 interface ServerOptions {
   host: string;
@@ -230,8 +220,8 @@ export function createImapSmtpConnector(deps: ImapSmtpDeps = defaultDeps): Conne
   return {
     key: "imap_smtp",
     category: "mail",
-    name: "Altra casella (IMAP/SMTP)",
-    description: "Qualsiasi casella con accesso IMAP e SMTP.",
+    name: IMAP_SMTP_NAME,
+    description: IMAP_SMTP_DESCRIPTION,
     connectMode: "credentials",
     inputSchema: ImapSmtpInput,
     emits: ["mail.received"],

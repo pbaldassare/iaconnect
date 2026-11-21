@@ -2,7 +2,7 @@ import "server-only";
 import { type CatalogGroup, buildCatalog, categoriesBlockedByFeatures } from "@/lib/connections/catalog";
 import { isFeatureEnabled } from "@/lib/features";
 import type { OrgContext } from "@/lib/session";
-import { listConnectors } from "@ia-connect/connectors";
+import { listConnectors } from "@ia-connect/connectors/web";
 import type { Row } from "@ia-connect/core";
 
 /**

@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { listConnectors } from "@ia-connect/connectors";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -24,6 +26,26 @@ import { createOAuthState, verifyOAuthState } from "../src/lib/connections/oauth
 import { describeRecipe, describeRecipeStep, intervalLabel } from "../src/lib/scrape/describe";
 
 const toJson = (schema: z.ZodType) => z.toJSONSchema(schema, { io: "input", unrepresentable: "any" });
+
+function sourceFiles(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? sourceFiles(join(dir, entry.name)) : [join(dir, entry.name)],
+  );
+}
+
+describe("web connector imports", () => {
+  it("does not statically import the Node connector registry", () => {
+    const root = join(import.meta.dirname, "..", "src");
+    const offenders: string[] = [];
+    for (const file of sourceFiles(root)) {
+      if (!file.endsWith(".ts") && !file.endsWith(".tsx")) continue;
+      const source = readFileSync(file, "utf8");
+      if (/from\s+"@ia-connect\/connectors"/.test(source)) offenders.push(file);
+      if (/import\s*\(\s*"@ia-connect\/connectors"\s*\)/.test(source)) offenders.push(file);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
 
 describe("JSON schema → form fields", () => {
   const schema = z.object({

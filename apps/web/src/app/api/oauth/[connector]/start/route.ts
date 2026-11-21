@@ -6,7 +6,7 @@ import { isUuid } from "@/lib/org-selection";
 import { requireOrgManager } from "@/lib/session";
 import { hasServiceKey } from "@/lib/supabase/service";
 import { appUrl } from "@/lib/url";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import { type NextRequest, NextResponse } from "next/server";
 
 /**

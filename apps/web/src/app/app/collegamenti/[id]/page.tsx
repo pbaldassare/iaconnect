@@ -12,7 +12,7 @@ import { connectionStatus, connectorCategoryLabel } from "@/lib/labels";
 import { isUuid } from "@/lib/org-selection";
 import { firstParam } from "@/lib/pagination";
 import { requireOrg } from "@/lib/session";
-import { getConnector } from "@ia-connect/connectors";
+import { getConnector } from "@ia-connect/connectors/web";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConnectionActions } from "../connection-actions";
